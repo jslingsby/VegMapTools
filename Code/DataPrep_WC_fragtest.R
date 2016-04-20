@@ -13,10 +13,12 @@ library(raster)
 library(gdalUtils)
 library(rgdal)
 library(dplyr)
+library(SDMTools)
+
 
 if(Sys.getenv("USER")=="jasper") {datwd <- "/Users/jasper/Documents/GIS/VegToolsRaw/"}
 if(Sys.getenv("USERNAME")=="MatlalaM") {datwd <- "Your data directory"}
-if(Sys.getenv("USERNAME")=="Receptionist") {datwd <- "Your data directory"}
+if(Sys.getenv("USERNAME")=="Receptionist") {datwd <- "C:/Users/Receptionist/Dropbox/Academics/PhD/Data/"}
 
 ##########################################
 ###2) Get and process data
