@@ -35,11 +35,20 @@ nex <- extent(2020000, 2140000, -4100000, -3950000)
 lc <- crop(lc, nex)
 
 ## Trim lc down to natural/transformed only (using two to compare differences in ClassStat based on the different categories)
-LC3V <- deratify(lc, att="LC3V", layer=1, complete=TRUE, drop=TRUE) 
-LC3 <- deratify(lc, att="LC3", layer=1, complete=TRUE, drop=TRUE)
+
+#derat <- deratify(lc, att="LC3V", layer=1, complete=TRUE, drop=F) 
+tab <-lc@data@attributes[[1]]
+
+subs(lc, tab, subsWithNA=TRUE, filename='lcsub')
+#m <- getValues(lc)
+#head(m)
+#m #values range from 0:16,128
 
 
-##########################################
+#lcsub <- subs(lc, tab, by = 3, which = 8)??????
+#length(by) == 1 | length(by) == nlayers(x)
+
+#########################################
 ##### 2) Fragmentation analysis #########
 ##########################################
 
