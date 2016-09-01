@@ -29,11 +29,11 @@ library(dplyr, lib.loc="/home/slingsby/Rlib")
 ##########################################
 
 #2012 National veg map rasterized to 30m
-vegA <- raster("VEG12test_web.tif")
+vegA <- raster("Rasters/VEG12test_web.tif")
 proj4string(vegA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs") #EPSG3857 - Web Mercator
 
 #Land cover
-lcA <- raster("LC13test_web.tif")
+lcA <- raster("Rasters/LC13test_web.tif")
 proj4string(lcA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs") #EPSG3857 - Web Mercator
 
 #lc1990 <- raster(paste(datwd,"Landcover/sa_lcov_1990_gti_utm35n_vs18.tif", sep=""))
@@ -42,7 +42,7 @@ proj4string(lcA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0
 #lc2013 <- raster(paste(datwd,"Landcover/sa_lcov_2013-14_gti_utm35n_vs22b.tif", sep=""))
 #lc2013 <- projectRaster(lc2013, crs = CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
 
-reA <- readOGR("REEA_OR_2016_Q2.shp", layer = "REEA_OR_2016_Q2")
+reA <- readOGR("Rasters/REEA_OR_2016_Q2.shp", layer = "REEA_OR_2016_Q2")
 reA <- spTransform(reA, CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
 reA <- reA[-which(reA@data$PROJ_STATU == "Withdrawn/Lapsed"),] #Remove "Withdrawn/Lapsed" development proposals
 
@@ -72,9 +72,9 @@ nextent[j] <- extent(c(x[sets[j,1],], y[sets[j,2],]))
 ##########################################
 ###4) Set up cluster
 ##########################################
-ntasks = length(nextent)
+ntasks <- length(nextent)
 
-cl=makeCluster(ntasks, type = "SOCK")
+cl <- makeCluster(ntasks/20, type = "SOCK")
 registerDoSNOW(cl)
 clusterEvalQ(cl, library(raster)) #, lib.loc="/home/slingsby/Rlib")) #Load necessary libraries on all nodes
 clusterEvalQ(cl, library(rgdal)) #, lib.loc="/home/slingsby/Rlib"))

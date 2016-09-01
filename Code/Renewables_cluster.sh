@@ -6,7 +6,7 @@
 #SBATCH --mail-type=All
 #SBATCH --mail-user=jasper@saeon.ac.za
 #SBATCH -p med
-#SBATCH --ntasks=1200
+#SBATCH --ntasks=60
 
 module load R
 R CMD BATCH Renewables_cluster.R
