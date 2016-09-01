@@ -31,7 +31,7 @@ crop(lc, nex, filename = "Data/CTtest.grd", overwrite=T)
 lc <- raster("Data/CTtest.grd")
 
 lcC <- lc #Set up a landcover with 1 for natural and NA for everything else...
-lcC[which(getValues(lc)==2)] <- NA
+#lcC[which(getValues(lc)==2)] <- NA
 
 ###VegMap 2006
 vm2006 <- readOGR(paste(datwd, "VM2006", sep=""), layer = "vegmap2006_geo") #Get data

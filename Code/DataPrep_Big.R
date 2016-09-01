@@ -52,9 +52,29 @@ lc <- crop(lc, nex)
 pa <- crop(pa, nex)
 vm <- crop(vm, nex)
 
+pdf("Output/transformation.pdf", width = 7, height = 6)
+plot(lc<4, col=c("black", "white"), legend = F)
+dev.off()
+
+pdf("Output/protectedareaBW.pdf", width = 7, height = 6)
+plot(pa>1, col=c("white", "black"), legend = F)
+dev.off()
+
+#pdf("Output/vegmap.pdf", width = 7, height = 6)
+#plot(pa, col=c("black", "white"), legend = F)
+#dev.off()
+
+redz <- readOGR("/Users/jasper/Documents/GIS/VegToolsRaw/Proposed energy developments/REDZ_DEA_Unpublished_Draft_2015_otd0W", layer="REDZ_DEA_Unpublished_Draft_2015")
+
+reea <- readOGR("/Users/jasper/Documents/GIS/VegToolsRaw/Proposed energy developments/REEA_OR_2015_Q4.kml", layer = "REEA_OR_2015_Q4")
+
+pdf("Output/renewableEnerGdevs.pdf", width = 7, height = 6)
+plot(reea)
+dev.off()
+
+###########
+
 lcx <- lc
-
-
 
 y <- levels(lc)[[1]]$Value[which(levels(lc)[[1]]$LC3V==1)]
 lc2 <- projectExtent(lc, crs = CRS(proj4string(lc)))
