@@ -3,7 +3,7 @@
 ######## and protected area data for VegMapTools analyses
 ##########################################
 ######## Compiled by Jasper Slingsby 2016
-######## Last edited: 1 September 2016
+######## Last edited: 7 September 2016
 ##########################################
 
 ##########################################
@@ -15,36 +15,29 @@
 #install.packages("rgdal", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 #install.packages("raster", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 #install.packages("dplyr", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("rgeos", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 
 ###Get libraries
-#library(doSNOW, lib.loc="/home/slingsby/Rlib")
-#library(foreach, lib.loc="/home/slingsby/Rlib")
-#library(raster, lib.loc="/home/slingsby/Rlib")
-#library(rgdal, lib.loc="/home/slingsby/Rlib")
-#library(dplyr, lib.loc="/home/slingsby/Rlib")
+library(doSNOW)#, lib.loc="/home/slingsby/Rlib")
+library(foreach)#, lib.loc="/home/slingsby/Rlib")
+library(raster)#, lib.loc="/home/slingsby/Rlib")
+library(rgdal)#, lib.loc="/home/slingsby/Rlib")
+library(rgeos)#, lib.loc="/home/slingsby/Rlib")
+library(dplyr)#, lib.loc="/home/slingsby/Rlib")
 
-library(doSNOW) #Delete these when you go to cluster!
-library(foreach)
-library(raster)
-#library(gdalUtils)
-library(rgdal)
-library(dplyr)
-
-
-if(Sys.getenv("USER")=="jasper") {datwd <- "/Users/jasper/Documents/GIS/VegToolsRaw/"}
-if(Sys.getenv("USERNAME")=="MatlalaM") {datwd <- "Your data directory"}
-if(Sys.getenv("USERNAME")=="Receptionist") {datwd <- "C:/Users/Receptionist/Dropbox/Academics/PhD/Data/"}
 
 ##########################################
 ###2) Get data
 ##########################################
 
+setwd("/Users/jasper/Documents/GIS/VegToolsRaw")
+
 #2012 National veg map rasterized to 30m
-vegA <- raster(paste(datwd,"Rasters/VEG12test_web.tif", sep=""))
+vegA <- raster("Rasters/VEG12test_web.tif")
 proj4string(vegA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs") #EPSG3857 - Web Mercator
 
 #Land cover
-lcA <- raster(paste(datwd,"Rasters/LC13test_web.tif", sep=""))
+lcA <- raster("Rasters/LC13test_web.tif")
 proj4string(lcA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs") #EPSG3857 - Web Mercator
 
 #lc1990 <- raster(paste(datwd,"Landcover/sa_lcov_1990_gti_utm35n_vs18.tif", sep=""))
@@ -53,9 +46,10 @@ proj4string(lcA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0
 #lc2013 <- raster(paste(datwd,"Landcover/sa_lcov_2013-14_gti_utm35n_vs22b.tif", sep=""))
 #lc2013 <- projectRaster(lc2013, crs = CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
 
-reA <- readOGR(paste(datwd,"Proposed energy developments/REEA_OR_2016_Q2/REEA_OR_2016_Q2.shp", sep=""), layer = "REEA_OR_2016_Q2")
+reA <- readOGR("Rasters/REEA_OR_2016_Q2.shp", layer = "REEA_OR_2016_Q2")
 reA <- spTransform(reA, CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
 reA <- reA[-which(reA@data$PROJ_STATU == "Withdrawn/Lapsed"),] #Remove "Withdrawn/Lapsed" development proposals
+reA <- gBuffer(reA, byid=TRUE, width=0)
 
 #Subset key info
 lctab <-lcA@data@attributes[[1]]
@@ -75,63 +69,79 @@ x <- cbind(seq(1774750, 3665260, 65190), seq(1839940, 3730450, 65190))  #Create 
 sets <- expand.grid(1:30, 1:40) #Set up indices
 nextent <- list() #Set up list for storing extents
 
-for(i in 1:nrow(sets)) #Loop through indices to make extents
+for(j in 1:nrow(sets)) #Loop through indices to make extents
 {
-nextent[i] <- extent(c(x[sets[i,1],], y[sets[i,2],]))
+  nextent[[j]] <- c(x[sets[j,1],], y[sets[j,2],])
 }
+
+warnings() #catch weird warning?
 
 ##########################################
 ###4) Set up cluster
 ##########################################
-ntasks = 2 #length(nextent)
+packageVec <- c("raster", "rgdal", "rgeos", "dplyr")
 
-cl=makeCluster(ntasks, type = "SOCK")
+ntasks <- 40 #length(nextent)
+
+cl <- makeCluster(2, type = "SOCK", outfile="REout.out") #ntasks/20
 registerDoSNOW(cl)
-clusterEvalQ(cl, library(raster)) #, lib.loc="/home/slingsby/Rlib")) #Load necessary libraries on all nodes
-clusterEvalQ(cl, library(rgdal)) #, lib.loc="/home/slingsby/Rlib"))
-clusterEvalQ(cl, library(dplyr)) #, lib.loc="/home/slingsby/Rlib"))
+
+clusterEvalQ(cl, Sys.setenv(TMPDIR = "/Users/jasper/Documents/GIS/VegToolsRaw/Temp"))
+clusterEvalQ(cl, Sys.setenv(TMP = "/Users/jasper/Documents/GIS/VegToolsRaw/Temp"))
+clusterEvalQ(cl, Sys.setenv(TEMP = "/Users/jasper/Documents/GIS/VegToolsRaw/Temp"))
+#clusterEvalQ(cl, library(raster)) #, lib.loc="/home/slingsby/Rlib")) #Load necessary libraries on all nodes
+#clusterEvalQ(cl, library(rgdal)) #, lib.loc="/home/slingsby/Rlib"))
+#clusterEvalQ(cl, library(rgeos)) #, lib.loc="/home/slingsby/Rlib"))
+#clusterEvalQ(cl, library(dplyr)) #, lib.loc="/home/slingsby/Rlib"))
 
 ###Run loop
-out <- foreach(i = 1:ntasks) %dopar% { 
+out <- foreach(i = 1:ntasks, .packages=packageVec) %dopar% { 
   
-##########################################
-###5) Start loop, set extent, crop, simplify, join and table
-##########################################
-#Set extent for loop
-
-nex <- nextent[[i]]
-
-#Crop rasters
-lc <- crop(lcA, nex)
-veg <- crop(vegA, nex)
-re <- crop(reA, nex)
-
-#Simplify datasets to key info
-lc <- deratify(lc, att="LC3", layer=1, complete=TRUE, drop=F)
-lc[which(getValues(lc) %in% c(0, 128))] <- NA #Ocean
-lc[which(getValues(lc) %in% c(1:3, 6, 10))] <- 1 #Natural or Near-natural
-lc[which(getValues(lc) %in% c(4, 5, 7:9, 11:16))] <- 0 #Transformed
-
-veg <- deratify(veg, att="Value", layer=1, complete=TRUE, drop=F)
-
-#Rasterize renewables layer and cut from landcover if necessary
-if(!is.null(re)) {
-  re@data <- data.frame(Val = rep(1, length = nrow(re@data)))
-  rer <- rasterize(re,lc)
-  lcre <- lc
-  lcre[getValues(rer)>0] <- 0
+  cat(paste("Running task", i, sep=" "))  
+  
+  ##########################################
+  ###5) Start loop, set extent, crop, simplify, join and table
+  ##########################################
+  #Set extent for loop
+  
+  nex <- extent(nextent[[i]])
+  
+  #Crop rasters
+  lc <- crop(lcA, nex)
+  veg <- crop(vegA, nex)
+  re <- crop(reA, nex)
+  
+  #Simplify datasets to key info
+  lc <- deratify(lc, att="LC3", layer=1, complete=TRUE, drop=F)
+  lc[which(getValues(lc) %in% c(0, 128))] <- NA #Ocean
+  lc[which(getValues(lc) %in% c(1:3, 6, 10))] <- 1 #Natural or Near-natural
+  lc[which(getValues(lc) %in% c(4, 5, 7:9, 11:16))] <- 0 #Transformed
+  
+  veg <- deratify(veg, att="Value", layer=1, complete=TRUE, drop=F)
+  
+  #Rasterize renewables layer and cut from landcover if necessary
+  if(!is.null(re)) {
+    cat("There are RE impacts in this extent")
+    re <- gBuffer(re, byid=TRUE, width=0)
+    re@data <- data.frame(Val = rep(1, length = nrow(re@data)))
+    rer <- rasterize(re,lc)
+    lcre <- lc
+    lcre[getValues(rer)>0] <- 0
   } else {lcre <- lc}
-
-#Stack all rasters, extract to data frame and summarise data by veg type
-names(lc) <- "LandCover"
-names(veg) <- "VegType"
-names(lcre) <- "RE_LandCover"
-
-dat <- stack(lc, veg, lcre)
-df <- as.data.frame(dat)
-vsum <- summarise(group_by(df, VegType), LandCover=sum(LandCover), RE_LandCover=sum(RE_LandCover))
-vsum$OriginalExtent <- summary(as.factor(getValues(veg)))
-vsum
+  
+  #Stack all rasters, extract to data frame and summarise data by veg type
+  names(lc) <- "LandCover"
+  names(veg) <- "VegType"
+  names(lcre) <- "RE_LandCover"
+  
+  dat <- stack(lc, veg, lcre)
+  df <- as.data.frame(dat)
+  cat("Summarizing")
+  vsum <- summarise(group_by(df, VegType), LandCover=sum(as.numeric(LandCover_LC3)), RE_LandCover=sum(as.numeric(RE_LandCover_LC3)))
+  cat("It worked")
+  vsum$OriginalExtent <- summary(as.factor(getValues(veg)))
+  i
+  return(vsum)
 }
 
 #Kill children...  
@@ -141,10 +151,12 @@ stopCluster(cl)
 ###6) Summarize, save and exit
 ##############################################################################
 
+cat("Summarizing all results")
+
 dfsum <- do.call(rbind, out)
 REsum <- summarise(group_by(dfsum, VegType), LandCover=sum(LandCover), RE_LandCover=sum(RE_LandCover), OriginalExtent=sum(OriginalExtent))
 
-save(REsum, file="RE.Rdata")
+save(i, REsum, vegtab, file="RE.Rdata")
 quit(save="no")
 
 

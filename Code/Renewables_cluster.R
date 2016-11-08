@@ -10,23 +10,27 @@
 ###1) Get libraries and setwd
 ##########################################
 ###Install libraries
-install.packages("doSNOW", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-install.packages("foreach", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-install.packages("rgdal", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-install.packages("raster", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-install.packages("dplyr", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("doSNOW", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("foreach", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("rgdal", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("raster", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("dplyr", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("rgeos", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 
 ###Get libraries
 library(doSNOW, lib.loc="/home/slingsby/Rlib")
 library(foreach, lib.loc="/home/slingsby/Rlib")
 library(raster, lib.loc="/home/slingsby/Rlib")
 library(rgdal, lib.loc="/home/slingsby/Rlib")
+library(rgeos, lib.loc="/home/slingsby/Rlib")
 library(dplyr, lib.loc="/home/slingsby/Rlib")
 
 
 ##########################################
 ###2) Get data
 ##########################################
+
+setwd("/home/slingsby")
 
 #2012 National veg map rasterized to 30m
 vegA <- raster("Rasters/VEG12test_web.tif")
@@ -45,6 +49,7 @@ proj4string(lcA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0
 reA <- readOGR("Rasters/REEA_OR_2016_Q2.shp", layer = "REEA_OR_2016_Q2")
 reA <- spTransform(reA, CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
 reA <- reA[-which(reA@data$PROJ_STATU == "Withdrawn/Lapsed"),] #Remove "Withdrawn/Lapsed" development proposals
+reA <- gBuffer(reA, byid=TRUE, width=0)
 
 #Subset key info
 lctab <-lcA@data@attributes[[1]]
@@ -66,29 +71,40 @@ nextent <- list() #Set up list for storing extents
 
 for(j in 1:nrow(sets)) #Loop through indices to make extents
 {
-nextent[j] <- extent(c(x[sets[j,1],], y[sets[j,2],]))
+nextent[[j]] <- c(x[sets[j,1],], y[sets[j,2],])
 }
+
+warnings() #catch weird warning?
 
 ##########################################
 ###4) Set up cluster
 ##########################################
+packageVec <- c("raster", "rgdal", "rgeos", "dplyr")
+
 ntasks <- length(nextent)
 
-cl <- makeCluster(ntasks/20, type = "SOCK")
+cl <- makeCluster(ntasks/20, type = "SOCK", outfile="REout.out")
 registerDoSNOW(cl)
-clusterEvalQ(cl, library(raster)) #, lib.loc="/home/slingsby/Rlib")) #Load necessary libraries on all nodes
-clusterEvalQ(cl, library(rgdal)) #, lib.loc="/home/slingsby/Rlib"))
-clusterEvalQ(cl, library(dplyr)) #, lib.loc="/home/slingsby/Rlib"))
+
+clusterEvalQ(cl, Sys.setenv(TMPDIR = "/home/slingsby/tmp/"))
+clusterEvalQ(cl, Sys.setenv(TMP = "/home/slingsby/tmp"))
+clusterEvalQ(cl, Sys.setenv(TEMP = "/home/slingsby/tmp"))
+#clusterEvalQ(cl, library(raster)) #, lib.loc="/home/slingsby/Rlib")) #Load necessary libraries on all nodes
+#clusterEvalQ(cl, library(rgdal)) #, lib.loc="/home/slingsby/Rlib"))
+#clusterEvalQ(cl, library(rgeos)) #, lib.loc="/home/slingsby/Rlib"))
+#clusterEvalQ(cl, library(dplyr)) #, lib.loc="/home/slingsby/Rlib"))
 
 ###Run loop
-out <- foreach(i = 1:ntasks) %dopar% { 
-  
+out <- foreach(i = 1:ntasks, .packages=packageVec) %dopar% { 
+
+cat(paste("Running task", i, sep=" "))  
+    
 ##########################################
 ###5) Start loop, set extent, crop, simplify, join and table
 ##########################################
 #Set extent for loop
 
-nex <- nextent[[i]]
+nex <- extent(nextent[[i]])
 
 #Crop rasters
 lc <- crop(lcA, nex)
@@ -105,6 +121,8 @@ veg <- deratify(veg, att="Value", layer=1, complete=TRUE, drop=F)
 
 #Rasterize renewables layer and cut from landcover if necessary
 if(!is.null(re)) {
+  cat("There are RE impacts in this extent")
+  re <- gBuffer(re, byid=TRUE, width=0)
   re@data <- data.frame(Val = rep(1, length = nrow(re@data)))
   rer <- rasterize(re,lc)
   lcre <- lc
@@ -118,10 +136,12 @@ names(lcre) <- "RE_LandCover"
 
 dat <- stack(lc, veg, lcre)
 df <- as.data.frame(dat)
-vsum <- summarise(group_by(df, VegType), LandCover=sum(LandCover), RE_LandCover=sum(RE_LandCover))
+cat("Summarizing")
+vsum <- summarise(group_by(df, VegType), LandCover=sum(as.numeric(LandCover_LC3)), RE_LandCover=sum(as.numeric(RE_LandCover_LC3)))
+cat("It worked")
 vsum$OriginalExtent <- summary(as.factor(getValues(veg)))
 i
-vsum
+return(vsum)
 }
 
 #Kill children...  
@@ -131,10 +151,12 @@ stopCluster(cl)
 ###6) Summarize, save and exit
 ##############################################################################
 
+cat("Summarizing all results")
+
 dfsum <- do.call(rbind, out)
 REsum <- summarise(group_by(dfsum, VegType), LandCover=sum(LandCover), RE_LandCover=sum(RE_LandCover), OriginalExtent=sum(OriginalExtent))
 
-save(i, REsum, file="RE.Rdata")
+save(i, REsum, vegtab, file="RE.Rdata")
 quit(save="no")
 
 

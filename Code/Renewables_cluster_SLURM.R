@@ -7,7 +7,7 @@
 scp -r /Users/jasper/Documents/GIS/VegToolsRaw/Rasters.zip slingsby@agri.cse.ucdavis.edu:/home/slingsby/Rasters.zip
 
 #Temp code and batch script (dnorm)
-scp -r //Users/jasper/GIT/VegMapTools/Code/Renewables_cluster.R slingsby@agri.cse.ucdavis.edu:/home/slingsby/Renewables_cluster.R
+scp -r /Users/jasper/GIT/VegMapTools/Code/Renewables_cluster.R slingsby@agri.cse.ucdavis.edu:/home/slingsby/Renewables_cluster.R
 
 scp -r /Users/jasper/GIT/VegMapTools/Code/Renewables_cluster.sh slingsby@agri.cse.ucdavis.edu:/home/slingsby/Renewables_cluster.sh
 
@@ -19,7 +19,12 @@ ssh slingsby@agri.cse.ucdavis.edu
 sbatch Renewables_cluster.sh
 
 ###check if job is running
+squeue --jobs 10240810 (i.e. job number)
+
+###check all jobs running
 squeue
+
+#to kill job - scancel 10230477
 
 ###Look at R output so far
 cat *.Rout

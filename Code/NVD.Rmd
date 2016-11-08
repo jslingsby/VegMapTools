@@ -1,0 +1,243 @@
+---
+title: "A quick exploration of the National Vegetation Database"
+author: "Jasper Slingsby"
+date: "25 October 2016"
+output: html_document
+---
+
+```{r, echo=FALSE}
+#suppressWarnings(suppressMessages(
+suppressWarnings(suppressMessages(library(gdata, quietly=T)))
+suppressWarnings(suppressMessages(library(sp, quietly=T)))
+suppressWarnings(suppressMessages(library(maps, quietly=T)))
+suppressWarnings(suppressMessages(library(maptools, quietly=T)))
+suppressWarnings(suppressMessages(library(raster, quietly=T)))
+suppressWarnings(suppressMessages(library(ggplot2, quietly=T)))
+suppressWarnings(suppressMessages(library(gstat, quietly=T)))
+suppressWarnings(suppressMessages(library(rgdal, quietly=T)))
+suppressWarnings(suppressMessages(library(gjam, quietly=T)))
+suppressWarnings(suppressMessages(library(ggmap, quietly=T)))
+suppressWarnings(suppressMessages(library(dplyr, quietly=T)))
+#))
+
+###Set data working directory
+datwd <- "/Users/jasper/Documents/Databases/NVD/NVD_16_09_2016/"
+
+##########################################
+###2) Get data
+##########################################
+
+#Get vegmap shapefile
+#veg06 <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/VM2006/vegmap2006_geo.shp", layer = "vegmap2006_geo", verbose = FALSE) #Vegmap 2006
+suppressMessages(veg <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/VM2012/nvm2012beta2_wgs84_Geo.shp", layer = "nvm2012beta2_wgs84_Geo", verbose = FALSE)) #Vegmap 2012
+
+#Get hydrology veg clusters and merge into vegmap data
+hydC <- read.xls("/Users/jasper/Documents/GIS/VegToolsRaw/Hydrology_Baseline/Final clusters.xls", sheet=1) #Hydrology clusters from Michele Toucher 1 Nov 2016
+names(hydC)[which(names(hydC)=="Name")] <- "NAME"
+hydC <- hydC[,c(1,8)]
+
+x <- merge(veg@data, hydC, all.x=T, sort=F)
+x <- x[order(x$OBJECTID_1),]
+veg@data <- x
+
+#Get pentads
+suppressWarnings(pen <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/pentads/pentads/PENT_PRO.SHP", layer = "PENT_PRO"))
+
+#Get landcover (lumped to natural vs not natural classes)
+lc <- raster("/Users/jasper/Documents/GIS/VegToolsRaw/Landcover/LCsmiso_trans1.tif")
+
+#Get rePhoto database
+rP <- read.csv("/Users/jasper/Dropbox/SAEON/Grants/FBIP2016/rePhoto/Index to database 16.iv.2013.csv", stringsAsFactors = F) 
+
+#Get SANBI checklist
+#clist <- read.xls("/Users/jasper/Documents/GIS/VegToolsRaw/SANBI_checklist_20June2016.xlsx", sheet = 1)
+
+#Get NVD
+#HD <- read.csv(paste0(datwd, "HeaderData_NVD2014.txt")) #Header Data
+HD <- read.csv(paste0(datwd, "HeaderData_NVD2014.csv")) #Header Data
+#HD2 <- read.xls(paste0(datwd, "HeaderData_NVD2014.xlsx"), sheet=1) #Header Data
+SD <- read.csv(paste0(datwd, "SpeciesData.txt")) #Species Data
+SN <- read.csv(paste0(datwd, "SpeciesList.txt")) #Species Names
+MD <- read.csv(paste0(datwd, "MetadataActionsEtc_Head.txt")) #Meta Data
+
+##########################################
+###3) Summary of NVD fields
+##########################################
+
+HeadSummary <- data.frame(
+  Complete = sapply(HD, function(x){sum(!is.na(x))}), #Non-NA values
+  LengthUniqueVals = sapply(HD, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
+  UniqueVals = sapply(HD, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
+#write.csv(HeadSummary, paste0(datwd,"SummaryStats.csv"))
+
+##########################################
+###4) Crosscheck species names with checklist
+##########################################
+
+#clist$CHECKLISTNAME <- paste(clist$genus, clist$sp1, sep = " ")
+#snr <- merge(SN, clist, by.x = "SPNUMBER", by.y = "spnumber", all.x = T)
+
+#snr <- snr[,c("SPNUMBER", "SPECIES_NR", "SPECIESNAME", "CHECKLISTNAME", "syncat", "synof")]
+
+#SnD <- merge(SD, snr)
+
+#SnD <- merge(SnD, posa)
+
+#snr <- SN[,c("SPECIES_NR", "SPNUMBER")]
+#snr <- merge(SD, snr)
+#sum(snr$SPNUMBER %in% clist$spnumber)
+
+##########################################
+###4) Visualize plots and repeat photos
+##########################################
+
+p <- rP
+suppressWarnings(suppressMessages(p$DD..S. <- -as.numeric(p$DD..S.)))
+suppressWarnings(suppressMessages(p$DD..E. <- as.numeric(p$DD..E.)))
+p <- p[!is.na(p$DD..S.) & !is.na(p$DD..E.),]
+coordinates(p) <- cbind(p$DD..E., p$DD..S.)
+proj4string(p) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" #Assign a coordinate reference system (Geographic WGS84)
+
+#Make new data frame to use for spatial analyses
+d <- HD[!is.na(HD$Lat) & !is.na(HD$Long),] # remove plots with no Lat or Long
+
+#Convert data frame to a SpatialPointsDataFrame
+coordinates(d) <- cbind(d$Long, d$Lat)
+proj4string(d) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" #Assign a coordinate reference system (Geographic WGS84)
+
+#Fix errors by overlaying points and polygon
+map <- map("world", region = "south africa", fill = TRUE, plot=F)
+IDs <- sapply(strsplit(map$names, ":"), function(x) x[1])
+map <- map2SpatialPolygons(map, IDs=IDs, proj4string=CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+map <- crop(map, d) #Crop the map to the points (to drop the Prince Edward Islands)
+
+#Trim plots with poor locality data
+#d <- d[-which(d$Loc_Conf<0),]
+#d <- d[-which(is.na(d$Loc_Conf)),]
+
+#Extract vegmap, hydrological clusters and land cover data
+x <- d %over% map
+v <- d %over% veg
+d$Veg <- v$NAME
+d$Hyd <- v$Cluster.name
+suppressWarnings(d$LandCover <- extract(lc, d)) #1 = Natural, 2 = Transformed
+
+#d <- d[which(x==1), ]
+#x <- d %over% map
+y <- p %over% map
+
+#Insert frequency of plots into vegmap
+vpf <- table(d@data$Veg) #plots per veg type
+vpf <- as.data.frame(vpf)
+names(vpf)[1] <- "NAME"
+
+ppf <- table(v$OBJECTID_1) #plots per veg polygon
+ppf <- as.data.frame(ppf)
+names(ppf) <- c("OBJECTID_1", "PFreq")
+  
+vpf <- merge(veg@data, vpf)
+vpf <- merge(vpf, ppf, all.x=T)
+vpf <- vpf[order(vpf$OBJECTID_1),]
+vpf$PFreq[is.na(vpf$PFreq)] <- 0
+veg@data <- vpf
+
+```
+
+**Lets have a look at the basic stats**
+
+Number of plots altogether = `r  nrow(HD)`
+
+Number of plots with spatial data = `r nrow(d)`
+
+Number of unique species names = `r length(unique(SN$LETTERCODE))` - lots if issues there!
+
+Number of unique genus names = `r length(unique(SN$GenName))` - suspicious too...
+
+Number of species by site observations = `r nrow(SD)`
+
+***
+
+Below we see the spatial distribution of plots, with larger circles indicating poor location confidence, and red plots falling in the sea:
+
+```{r, echo=FALSE}
+plot(map)
+suppressWarnings(points(d[which(x==1), ], cex=.1*log(d[which(x==1), ]$Loc_Conf+1))) #Plots
+points(d[is.na(x),], cex=.25, col="red") #Plots at sea (or next door)
+```
+
+Clearly there are large gaps, and lost of spatial inaccuracy!
+
+***
+
+The distribution of studies by year:
+
+```{r, echo=FALSE}
+hist(MD$SelectYear, xlab = "Year", main = "", ylab = "# of Studies")
+```
+
+This pattern suggests that the number of surveys is declining through time, or that there is less interest in submitting survey data to the NVD, or (most likely) both.
+
+***
+
+A histogram of plot sizes:
+
+```{r, echo=FALSE}
+hist(d$SURF_AREA, main="", xlab="Plot area (m^2)", ylab="# of plots", breaks=seq(0, 5000, 10))
+```
+
+There is large varyation in plot size, but 5 x 10m Braun-Blanquet style releves make up more than a quarter of the plots.
+
+***
+
+What about representation of plots in the National Vegetation Map (2012) vegetation types (447 altogether)?
+
+```{r, echo=FALSE}
+hist(table(d$Veg), ylab = "Number of vegetation types", xlab = "Number of plots", main ="")
+```
+
+There are `r sum(table(d$Veg)<1)` veg types without any plot data, `r sum(table(d$Veg)<5)` with less than 5 plots, and `r sum(table(d$Veg)<10)` with less than 10 plots...
+
+If we consider the `r length(veg@data$Freq)` mapped polygons (there are multiple polygons per veg type), there are `r sum(veg@data$PFreq<1)` polygons without any plot data, `r sum(veg@data$PFreq<5)` with less than 5 plots, and `r sum(veg@data$PFreq<10)` with less than 10 plots...
+
+***
+
+But! `r summary(as.factor(d$LandCover))[2]` of the `r nrow(d@data)` plots with spatial information are now in transformed landscapes according to the 2013 National Land Cover. So let's look at the stats for veg types again, excluding transformed plots...
+
+```{r, echo=FALSE}
+nd <- d[which(d$LandCover==1),]
+```
+
+There are `r sum(table(nd$Veg)<1)` veg types without any plot data, `r sum(table(nd$Veg)<5)` with less than 5 plots, and `r sum(table(nd$Veg)<10)` with less than 10 plots...
+
+***
+
+Now let's look at the density of sampling (# plots/Ha) by polygon where red is low sampling and bright yellow is high sampling.
+
+```{r, echo=F}
+# Plot VegMap
+plot(veg, col=rev(heat.colors(21)[ceiling(veg@data$PFreq/(veg@data$SHAPE_AREA/10000))+1]), border="transparent")
+#points(nd)
+
+
+#Veg map data for plotting in ggplot2
+#vd <- tbl_df(as.data.frame(veg))
+#vvd <- fortify(veg)
+#vd$id <- as.character(0:(nrow(vd)-1))
+#vvd <- left_join(vvd, vd, by="id", copy=T)
+#m <- ggplot() + geom_polygon(data = vvd, aes(x = long, y = lat, group = id, color = Freq), size = 0.25) + coord_map()
+#m
+```
+
+***THERE'S LOT OF WORK TO DO!!!***
+
+
+***
+
+```{r, echo=FALSE}
+#The locations of known rePhoto sites (that can provide a historical basis for plots):
+#plot(map)
+#points(p[which(y==1),], cex=.25, col="blue") #rePhoto pics
+```
+
+
+
