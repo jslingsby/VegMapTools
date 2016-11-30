@@ -55,6 +55,15 @@ MDSummary <- data.frame(
   LengthUniqueVals = sapply(MD, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
   UniqueVals = sapply(MD, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
 
+SDSummary <- data.frame(
+  Complete = sapply(SD, function(x){sum(!is.na(x))}), #Non-NA values
+  LengthUniqueVals = sapply(SD, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
+  UniqueVals = sapply(SD, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
+
+SNSummary <- data.frame(
+  Complete = sapply(SN, function(x){sum(!is.na(x))}), #Non-NA values
+  LengthUniqueVals = sapply(SN, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
+  UniqueVals = sapply(SN, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
 
 ##########################################
 ###4) Visualize plots and repeat photos

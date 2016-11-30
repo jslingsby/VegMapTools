@@ -1,7 +1,7 @@
 ---
-title: "Exploration of the use of the National Vegetation Database to estimate vegetation parameters for hydrological modelling"
+title: "Exploration of the use of the National Vegetation Database to estimate vegetation parameters for hydrological modeling"
 author: "Jasper Slingsby"
-date: "7 Novemer 2016"
+date: "8 Novemer 2016"
 output: html_document
 ---
 
@@ -41,17 +41,13 @@ x <- x[order(x$OBJECTID_1),]
 veg@data <- x
 
 #Get pentads
-suppressWarnings(pen <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/pentads/pentads/PENT_PRO.SHP", layer = "PENT_PRO"))
+#suppressWarnings(pen <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/pentads/pentads/PENT_PRO.SHP", layer = "PENT_PRO"))
 
 #Get landcover (lumped to natural vs not natural classes)
 lc <- raster("/Users/jasper/Documents/GIS/VegToolsRaw/Landcover/LCsmiso_trans1.tif")
 
 #Get rePhoto database
-rP <- read.csv("/Users/jasper/Dropbox/SAEON/Grants/FBIP2016/rePhoto/Index to database 16.iv.2013.csv", stringsAsFactors = F) 
-
-#Get SANBI checklist
-clist <- read.xls("/Users/jasper/Documents/GIS/VegToolsRaw/SANBI_checklist_20June2016.xlsx", sheet = 1)
-
+#rP <- read.csv("/Users/jasper/Dropbox/SAEON/Grants/FBIP2016/rePhoto/Index to database 16.iv.2013.csv", stringsAsFactors = F) 
 #Get NVD
 #HD <- read.csv(paste0(datwd, "HeaderData_NVD2014.txt")) #Header Data
 HD <- read.csv(paste0(datwd, "HeaderData_NVD2014.csv")) #Header Data
@@ -60,22 +56,25 @@ SD <- read.csv(paste0(datwd, "SpeciesData.txt")) #Species Data
 SN <- read.csv(paste0(datwd, "SpeciesList.txt")) #Species Names
 MD <- read.csv(paste0(datwd, "MetadataActionsEtc_Head.txt")) #Meta Data
 
-#Get POSA
-posa <- read.csv("/Users/jasper/Documents/Databases/POSAoffline/POSAoffline_Species_GrowthForm.txt")
-posaN <- read.csv("/Users/jasper/Documents/Databases/POSAoffline/POSAoffline_Species.txt")
+#Get SANBI checklist
+#clist <- read.xls("/Users/jasper/Documents/GIS/VegToolsRaw/SANBI_checklist_20June2016.xlsx", sheet = 1)
 
-posa <- merge(posaN, posa, all.x=T)
-posa <- posa[-which(posa$GrowthForm %in% c("Bryophyte", "Lichen")),]
+##Get POSA
+#posa <- read.csv("/Users/jasper/Documents/Databases/POSAoffline/POSAoffline_Species_GrowthForm.txt")
+#posaN <- read.csv("/Users/jasper/Documents/Databases/POSAoffline/POSAoffline_Species.txt")
+
+#posa <- merge(posaN, posa, all.x=T)
+#posa <- posa[-which(posa$GrowthForm %in% c("Bryophyte", "Lichen")),]
 
 #posa$NameCode <- paste(posa$GENNO, posa$SPNO, sep = "_")
 #gfs <- as.data.frame(table(posa$NameCode, posa$GrowthForm))
 
 #write.csv(levels(posa$GrowthForm), "posa_growth_forms.csv")
 
-colnames(x) <- c("plot", "abund", "id")
-y <- tapply(x$abund, list(x$plot, x$id), sum)
-y[is.na(y)] <- 0
-as.data.frame(y)
+#colnames(x) <- c("plot", "abund", "id")
+#y <- tapply(x$abund, list(x$plot, x$id), sum)
+#y[is.na(y)] <- 0
+#as.data.frame(y)
 
 ##########################################
 ###3) Summary of NVD fields
@@ -91,14 +90,14 @@ HeadSummary <- data.frame(
 ###4) Crosscheck species names with checklist
 ##########################################
 
-clist$CHECKLISTNAME <- paste(clist$genus, clist$sp1, sep = " ")
-snr <- merge(SN, clist, by.x = "SPNUMBER", by.y = "spnumber", all.x = T)
+#clist$CHECKLISTNAME <- paste(clist$genus, clist$sp1, sep = " ")
+#snr <- merge(SN, clist, by.x = "SPNUMBER", by.y = "spnumber", all.x = T)
 
-snr <- snr[,c("SPNUMBER", "SPECIES_NR", "SPECIESNAME", "CHECKLISTNAME", "syncat", "synof")]
+#snr <- snr[,c("SPNUMBER", "SPECIES_NR", "SPECIESNAME", "CHECKLISTNAME", "syncat", "synof")]
 
-SnD <- merge(SD, snr)
+#SnD <- merge(SD, snr)
 
-SnD <- merge(SnD, posa)
+#SnD <- merge(SnD, posa)
 
 #snr <- SN[,c("SPECIES_NR", "SPNUMBER")]
 #snr <- merge(SD, snr)
@@ -108,12 +107,12 @@ SnD <- merge(SnD, posa)
 ###4) Visualize plots and repeat photos
 ##########################################
 
-p <- rP
-suppressWarnings(suppressMessages(p$DD..S. <- -as.numeric(p$DD..S.)))
-suppressWarnings(suppressMessages(p$DD..E. <- as.numeric(p$DD..E.)))
-p <- p[!is.na(p$DD..S.) & !is.na(p$DD..E.),]
-coordinates(p) <- cbind(p$DD..E., p$DD..S.)
-proj4string(p) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" #Assign a coordinate reference system (Geographic WGS84)
+#p <- rP
+#suppressWarnings(suppressMessages(p$DD..S. <- -as.numeric(p$DD..S.)))
+#suppressWarnings(suppressMessages(p$DD..E. <- as.numeric(p$DD..E.)))
+#p <- p[!is.na(p$DD..S.) & !is.na(p$DD..E.),]
+#coordinates(p) <- cbind(p$DD..E., p$DD..S.)
+#proj4string(p) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" #Assign a coordinate reference system (Geographic WGS84)
 
 #Make new data frame to use for spatial analyses
 d <- HD[!is.na(HD$Lat) & !is.na(HD$Long),] # remove plots with no Lat or Long
@@ -141,7 +140,7 @@ suppressMessages(d$LandCover <- extract(lc, d)) #1 = Natural, 2 = Transformed
 
 #d <- d[which(x==1), ]
 #x <- d %over% map
-y <- p %over% map
+#y <- p %over% map
 
 #Insert frequency of plots into vegmap
 vpf <- table(d@data$Veg)
@@ -176,24 +175,7 @@ suppressWarnings(points(d[which(x==1), ], cex=.1*log(d[which(x==1), ]$Loc_Conf+1
 points(d[is.na(x),], cex=.25, col="red") #Plots at sea (or next door)
 ```
 
-The locations of known rePhoto sites:
-
-```{r, echo=FALSE}
-plot(map)
-points(p[which(y==1),], cex=.25, col="blue") #rePhoto pics
-```
-
-The distribution of studies by year:
-
-```{r, echo=FALSE}
-hist(MD$SelectYear, xlab = "Year", main = "", ylab = "# of Studies")
-```
-
-A histogram of plot sizes:
-
-```{r, echo=FALSE}
-hist(d$SURF_AREA, main="", xlab="Plot area (m^2)", ylab="# of plots", breaks=seq(0, 5000, 10))
-```
+***
 
 What about representation of plots in the National Vegetation Map (2012) vegetation types (447 altogether)?
 
@@ -224,10 +206,17 @@ hist(table(nd$Hyd), ylab = "Number of hydro clusters", xlab = "Number of plots",
 
 There are `r sum(table(nd$Hyd)<1)` veg types without any plot data, `r sum(table(nd$Hyd)<5)` veg types with less than 5 plots, `r sum(table(nd$Hyd)<10)` veg types with less than 10 plots...
 
+We can still use the data from the transformed sites, but we obviously can't revisit these sites to measure any additional parameters.
+
+***
+Here's teh representation by ecohydrological cluster:
+
 ```{r, echo=F}
+table(d$Hyd)
+
 # Plot VegMap
-plot(veg, col=rev(heat.colors(veg@data$Freq/veg@data$SHAPE_AREA)), border="transparent")
-points(nd)
+#plot(veg, col=rev(heat.colors(veg@data$Freq/veg@data$SHAPE_AREA)), border="transparent")
+#points(nd)
 
 
 #Veg map data for plotting in ggplot2
@@ -239,5 +228,4 @@ points(nd)
 #m
 ```
 
-
-
+***

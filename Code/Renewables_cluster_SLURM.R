@@ -6,6 +6,11 @@
 #Spatial data
 scp -r /Users/jasper/Documents/GIS/VegToolsRaw/Rasters.zip slingsby@agri.cse.ucdavis.edu:/home/slingsby/Rasters.zip
 
+#Just the Carbon data
+scp -r /Users/jasper/Documents/GIS/VegToolsRaw/Rasters/TotalEcosystemOrganicCarbon_g_C_sq.m_DEA_CSIR_1.1.9-2015-10-06.tif slingsby@agri.cse.ucdavis.edu:/home/slingsby/Rasters/TotalEcosystemOrganicCarbon_g_C_sq.m_DEA_CSIR_1.1.9-2015-10-06.tif
+
+scp -r /Users/jasper/Documents/GIS/VegToolsRaw/Rasters/TotalEcosystemOrganicCarbon_g_C_sq.m_DEA_CSIR_1.1.9-2015-10-06.sld slingsby@agri.cse.ucdavis.edu:/home/slingsby/Rasters/TotalEcosystemOrganicCarbon_g_C_sq.m_DEA_CSIR_1.1.9-2015-10-06.sld
+
 #Temp code and batch script (dnorm)
 scp -r /Users/jasper/GIT/VegMapTools/Code/Renewables_cluster.R slingsby@agri.cse.ucdavis.edu:/home/slingsby/Renewables_cluster.R
 

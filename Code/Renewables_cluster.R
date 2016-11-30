@@ -3,27 +3,27 @@
 ######## and protected area data for VegMapTools analyses
 ##########################################
 ######## Compiled by Jasper Slingsby 2016
-######## Last edited: 1 September 2016
+######## Last edited: 30 November 2016
 ##########################################
 
 ##########################################
 ###1) Get libraries and setwd
 ##########################################
 ###Install libraries
-#install.packages("doSNOW", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-#install.packages("foreach", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-#install.packages("rgdal", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-#install.packages("raster", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-#install.packages("dplyr", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
-#install.packages("rgeos", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+install.packages("doSNOW", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+install.packages("foreach", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+install.packages("rgdal", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+install.packages("raster", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+install.packages("dplyr", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+install.packages("rgeos", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 
 ###Get libraries
+library(dplyr, lib.loc="/home/slingsby/Rlib")
 library(doSNOW, lib.loc="/home/slingsby/Rlib")
 library(foreach, lib.loc="/home/slingsby/Rlib")
 library(raster, lib.loc="/home/slingsby/Rlib")
 library(rgdal, lib.loc="/home/slingsby/Rlib")
 library(rgeos, lib.loc="/home/slingsby/Rlib")
-library(dplyr, lib.loc="/home/slingsby/Rlib")
 
 
 ##########################################
@@ -39,6 +39,10 @@ proj4string(vegA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.
 #Land cover
 lcA <- raster("Rasters/LC13test_web.tif")
 proj4string(lcA) <- CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs") #EPSG3857 - Web Mercator
+
+#Total Ecosystem Organic Carbon
+teoc <- raster("Rasters/TotalEcosystemOrganicCarbon_g_C_sq.m_DEA_CSIR_1.1.9-2015-10-06.tif")
+teoc <- projectRaster(teoc, crs = CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
 
 #lc1990 <- raster(paste(datwd,"Landcover/sa_lcov_1990_gti_utm35n_vs18.tif", sep=""))
 #lc1990 <- projectRaster(lc1990, crs = CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
@@ -110,6 +114,7 @@ nex <- extent(nextent[[i]])
 lc <- crop(lcA, nex)
 veg <- crop(vegA, nex)
 re <- crop(reA, nex)
+tc <- projectRaster(teoc, lc)
 
 #Simplify datasets to key info
 lc <- deratify(lc, att="LC3", layer=1, complete=TRUE, drop=F)
@@ -133,11 +138,12 @@ if(!is.null(re)) {
 names(lc) <- "LandCover"
 names(veg) <- "VegType"
 names(lcre) <- "RE_LandCover"
+names(tc) <- "Total_Carbon"
 
-dat <- stack(lc, veg, lcre)
+dat <- stack(lc, veg, lcre, tc)
 df <- as.data.frame(dat)
 cat("Summarizing")
-vsum <- summarise(group_by(df, VegType), LandCover=sum(as.numeric(LandCover_LC3)), RE_LandCover=sum(as.numeric(RE_LandCover_LC3)))
+vsum <- summarise(group_by(df, VegType), LandCover=sum(as.numeric(LandCover_LC3)), RE_LandCover=sum(as.numeric(RE_LandCover_LC3)), Total_Carbon=sum(as.numeric(Total_Carbon)))
 cat("It worked")
 vsum$OriginalExtent <- summary(as.factor(getValues(veg)))
 i
@@ -154,7 +160,7 @@ stopCluster(cl)
 cat("Summarizing all results")
 
 dfsum <- do.call(rbind, out)
-REsum <- summarise(group_by(dfsum, VegType), LandCover=sum(LandCover), RE_LandCover=sum(RE_LandCover), OriginalExtent=sum(OriginalExtent))
+REsum <- summarise(group_by(dfsum, VegType), LandCover=sum(LandCover), RE_LandCover=sum(RE_LandCover), Total_Carbon=sum(as.numeric(Total_Carbon)), OriginalExtent=sum(OriginalExtent))
 
 save(i, REsum, vegtab, file="RE.Rdata")
 quit(save="no")

@@ -1,32 +1,1 @@
-"","x"
-"1","Bryophyte"
-"2","Carnivore"
-"3","Climber"
-"4","Creeper"
-"5","Cremnophyte"
-"6","Cyperoid"
-"7","Dwarf shrub"
-"8","Emergent hydrophyte"
-"9","Epihydate"
-"10","Epiphyte"
-"11","Geophyte"
-"12","Graminoid"
-"13","Haptophyte"
-"14","Helophyte"
-"15","Herb"
-"16","Hydrophyte"
-"17","Hyperhydate"
-"18","Lichen"
-"19","Lithophyte"
-"20","Mesophyte"
-"21","Parasite"
-"22","Pleustophyte"
-"23","Restioid"
-"24","Scrambler"
-"25","Shrub"
-"26","Succulent"
-"27","Sudd hydrophyte"
-"28","Suffrutex"
-"29","Tenagophyte"
-"30","Tree"
-"31","Xerophyte"
+x,DescriptionBryophyte,Carnivore,Climber,Creeper,Cremnophyte,Cliff plantCyperoid,Dwarf shrub,"A plant smaller than a shrub, which produces wood at its base and has abundant growth branching upwards from the base, the upper stems dying back at the end of each growing season."Emergent hydrophyte,Water plant with aerial partsEpihydate,Bottom rooted water plant with floating leavesEpiphyte,Geophyte,Graminoid,Haptophyte,Water plant attached to but not penetrating the substrateHelophyte,Terrestrial plants which tolerate submergenceHerb,Hydrophyte,Water plantHyperhydate,Emergent aquatic (lower parts almost always in water)Lichen,Lithophyte,Grows in rock cracksMesophyte,A plant needing only a moderate amount of waterParasite,Pleustophyte,Free-floating (at or on the water surface)Restioid,Scrambler,Shrub,Succulent,Sudd hydrophyte,An aquatic plant that grows rooted in suddSuffrutex,low-growing woody shrub or perennial with woody baseTenagophyte,"Juvenile submerged, adult emergent or terrestrial"Tree,Xerophyte,A plant needing very little water

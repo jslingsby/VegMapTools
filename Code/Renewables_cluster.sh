@@ -5,8 +5,9 @@
 #SBATCH -e /home/slingsby/error-%j.txt
 #SBATCH --mail-type=All
 #SBATCH --mail-user=jasper@saeon.ac.za
-#SBATCH -p med
+#SBATCH --partition=low
 #SBATCH --ntasks=60
+#SBATCH --time=5-0
 
 module load R
 R CMD BATCH Renewables_cluster.R
