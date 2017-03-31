@@ -1,0 +1,192 @@
+---
+title: "NVD for Nina"
+output: html_notebook
+---
+
+Get libraries and setwd
+
+```{r, warning=FALSE, echo=FALSE}
+##########################################
+###1) 
+##########################################
+###Install libraries
+library(gdata)
+library(sp)
+library(maps)
+library(maptools)
+library(raster)
+library(ggplot2)
+library(gstat)
+library(rgdal)
+library(gjam)
+
+###Set data working directory
+datwd <- "/Users/jasper/Documents/Databases/NVD/NVD_16_09_2016/"
+```
+
+Get data and summarize
+
+```{r, echo = F, warning=FALSE, message=FALSE}
+##########################################
+###2) Get data
+##########################################
+
+###Spatial data
+#Get 2006 vegmap shapefile
+veg <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/VM2006/vegmap2006_geo.shp", layer = "vegmap2006_geo") #Vegmap
+#pen <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/pentads/pentads/PENT_PRO.SHP", layer = "PENT_PRO")
+
+rP <- read.csv("/Users/jasper/Dropbox/SAEON/Grants/FBIP2016/rePhoto/Index to database 16.iv.2013.csv", stringsAsFactors = F) #rePhoto database
+
+#HD <- read.csv(paste0(datwd, "HeaderData_NVD2014.txt")) #Header Data
+HD <- read.csv(paste0(datwd, "HeaderData_NVD2014.csv")) #Header Data
+#HD2 <- read.xls(paste0(datwd, "HeaderData_NVD2014.xlsx"), sheet=1) #Header Data
+SD <- read.csv(paste0(datwd, "SpeciesData.txt")) #Species Data
+SN <- read.csv(paste0(datwd, "SpeciesList.txt")) #Species Names
+MD <- read.csv(paste0(datwd, "MetadataActionsEtc_Head.txt")) #Meta Data
+
+##########################################
+###3) Summary of fields
+##########################################
+
+HeadSummary <- data.frame(
+  Complete = sapply(HD, function(x){sum(!is.na(x))}), #Non-NA values
+  LengthUniqueVals = sapply(HD, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
+  UniqueVals = sapply(HD, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
+#write.csv(HeadSummary, paste0(datwd,"SummaryStats.csv"))
+
+MDSummary <- data.frame(
+  Complete = sapply(MD, function(x){sum(!is.na(x))}), #Non-NA values
+  LengthUniqueVals = sapply(MD, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
+  UniqueVals = sapply(MD, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
+
+SDSummary <- data.frame(
+  Complete = sapply(SD, function(x){sum(!is.na(x))}), #Non-NA values
+  LengthUniqueVals = sapply(SD, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
+  UniqueVals = sapply(SD, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
+
+SNSummary <- data.frame(
+  Complete = sapply(SN, function(x){sum(!is.na(x))}), #Non-NA values
+  LengthUniqueVals = sapply(SN, function(x){length(levels(as.factor(x)))}), #Number of unique values or factor levels
+  UniqueVals = sapply(SN, function(x){if(length(levels(as.factor(x)))<100) {paste(levels(as.factor(x)), collapse=",")} else {">100"}}))
+
+```
+
+#View summaries
+
+<br>
+
+Summary of plot-level fields
+
+<br>
+
+```{r, echo = F}
+HeadSummary
+```
+
+<br>
+
+Summary of study metadata fields
+
+<br>
+
+```{r, echo = F}
+MDSummary
+```
+
+<br>
+
+Summary of species data fields
+
+<br>
+
+```{r, echo = F}
+SDSummary
+```
+
+<br>
+
+Summary of species names fields
+
+<br>
+
+```{r, echo = F}
+SNSummary
+```
+
+#Visualize plots
+
+```{r, echo = F}
+#Make new data frame to use for spatial analyses
+d <- HD[!is.na(HD$Lat) & !is.na(HD$Long),] # remove plots with no Lat or Long
+
+#Convert data frame to a SpatialPointsDataFrame
+coordinates(d) <- cbind(d$Long, d$Lat)
+proj4string(d) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" #Assign a coordinate reference system (Geographic WGS84)
+
+#Fix errors by overlaying points and polygon
+map <- map("world", region = "south africa", fill = TRUE, plot=F)
+IDs <- sapply(strsplit(map$names, ":"), function(x) x[1])
+map <- map2SpatialPolygons(map, IDs=IDs, proj4string=CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+
+#Crop map to the ectent of the points
+map <- crop(map, d)
+
+#Overlay points, map and vegmap
+#x <- d %over% map #Points that are on land (1) vs in the see (0)
+v <- d %over% veg #Extract vegmap data for each plot (no guarantees of spatial accuracy though!)
+d$Veg <- v$NAME #Add veg type name to plot data
+d$Biome <- v$BIOME #Add biome name to plot data
+
+###Trim plots based on various criteria
+#Confidence in the spatial information
+d <- d[-which(d$Loc_Conf<0),]
+d <- d[-which(is.na(d$Loc_Conf)),]
+d <- d[which(d$Biome %in% c("Fynbos Biome", "Succulent Karoo Biome","Forests")),]
+
+levels(as.factor(d$Biome))
+
+###Visualize plots
+plot(map)
+points(d, cex=.1*log(d$Loc_Conf+1)) #Plots
+
+summary(as.factor(d$Biome))
+```
+
+<br>
+
+Obviously some confidence in the spatial data is unfounded... What is the actual confidence?
+
+<br>
+
+```{r, echo = F}
+
+hist(d$Loc_Conf)
+
+summary(as.factor(d$Loc_Conf))
+
+```
+
+<br>
+
+
+
+<br>
+
+```{r}
+summary(as.factor(d$Loc_Conf[which(d$Loc_Conf<1001)]))
+length(as.factor(d$Loc_Conf[which(d$Loc_Conf<1001)]))
+```
+
+```{r}
+cfr <- d[which(d$Loc_Conf<1001),]
+
+###Visualize plots
+plot(map)
+points(cfr, cex=.1*log(cfr$Loc_Conf+1)) #Plots
+
+
+```
+
+
+

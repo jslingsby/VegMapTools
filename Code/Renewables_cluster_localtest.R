@@ -13,6 +13,7 @@
 #install.packages("doSNOW", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 #install.packages("foreach", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 #install.packages("rgdal", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
+#install.packages("sp", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 #install.packages("raster", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 #install.packages("dplyr", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
 #install.packages("rgeos", lib="/home/slingsby/Rlib", repos="http://cran.cnr.Berkeley.edu/", dependencies=TRUE)
@@ -21,6 +22,7 @@
 library(dplyr)#, lib.loc="/home/slingsby/Rlib")
 library(doSNOW)#, lib.loc="/home/slingsby/Rlib")
 library(foreach)#, lib.loc="/home/slingsby/Rlib")
+library(sp)#, lib.loc="/home/slingsby/Rlib")
 library(raster)#, lib.loc="/home/slingsby/Rlib")
 library(rgdal)#, lib.loc="/home/slingsby/Rlib")
 library(rgeos)#, lib.loc="/home/slingsby/Rlib")
@@ -90,7 +92,7 @@ warnings() #catch weird warning?
 ##########################################
 ###4) Set up cluster
 ##########################################
-packageVec <- c("raster", "rgdal", "rgeos", "dplyr")
+packageVec <- c("dplyr", "raster", "rgdal", "rgeos")
 
 ntasks <- 3 #length(nextent)
 

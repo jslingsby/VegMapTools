@@ -94,16 +94,22 @@ map <- crop(map, d)
 #points(d, cex=.25) #, cex=log(d$Loc_Conf)/2)
 #points(p, cex=.25, col="blue")
 
-
-d <- d[-which(d$Loc_Conf<0),]
-d <- d[-which(is.na(d$Loc_Conf)),]
-
 x <- d %over% map
 v <- d %over% veg
+#tv <- td %over% veg
 d$Veg <- v$NAME
+d$Biome <- v$BIOME
 #d <- d[which(x==1), ]
 #x <- d %over% map
 y <- p %over% map
+
+summary(as.factor(d$Biome))
+
+###Trim plots based on various criteria
+td <- d[-which(d$Loc_Conf<0),]
+td <- d[-which(is.na(d$Loc_Conf)),]
+
+
 
 #plot(map)
 #points(d[which(x==1), ], cex=.1*log(d[which(x==1), ]$Loc_Conf+1)) #Plots
