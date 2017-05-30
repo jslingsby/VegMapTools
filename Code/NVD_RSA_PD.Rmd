@@ -1,0 +1,112 @@
+---
+title: "NVD plot data for RSA PD project"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document: default
+---
+
+A quick overview of the data. There are 2 files, a genus by site/plot matrix "genusmatrix_PA.csv" (object *gdat* below) and ancillary data for each plot "genus_PA_plotdat.csv" (object *d*), which includes plot spatial location, species richness etc. Note that the column "RELEVE_NR" in *d* matches the rownames of *gdat*.
+
+Data cleaning steps implemented so far:
+1) Data that had no location confidence information (column Loc_Conf) were excluded (~150 plots).
+
+2) Plots >1km from the coast or borders of SA were excluded (i.e. they won't fall within any 30s grid environmental data so why bother keeping them...).
+
+3) Plots with no surface area information were excluded.
+
+4) Plots where only a subset of the species were sampled were excluded. There are some subtle differences between the survey protocols used for the plots that remain ("All species present", "Full floristics", "Permanently recognisable species") in that we don't know if "All species present" and "Full floristics" include or exclude "Seasonally recognizable species" or if the author of the original study gave any thought to the difference...
+
+5) I trimmed the dataset to only the plots in the most common sizes: 16, 25, 50, 100, 200, 400, 900 square metres.
+
+6) I excluded ferns, lichens, lycopods, horsetails and bryophytes (although I may have missed some?).
+
+7) I excluded all alien species I could match with the SAPIA list (~750 listed alien species).
+
+Please let me know if you spot any errors or would like me to change any of the above.
+
+Ok, let's look at the data
+
+```{r}
+library(ggplot2)
+library(maps)
+library(maptools)
+library(raster)
+library(sp)
+
+gdat <- read.csv("/Users/jasper/GIT/VegMapTools/Data/genusmatrix_PA.csv", stringsAsFactors = F, row.names = 1)
+d <- read.csv("/Users/jasper/GIT/VegMapTools/Data/genus_PA_plotdat.csv", stringsAsFactors = F, row.names = 1)
+```
+
+so there are `r nrow(gdat)` plots and `r ncol(gdat)` genera.
+
+First off, there is an issue of varying plot size. The number of plots in each size class are indicated below:
+
+```{r}
+summary(as.factor(d$SURF_AREA)) #100m2 looks best...
+```
+
+How is that split up by biome?
+
+```{r}
+table(d$Biome, d$SURF_AREA)
+```
+
+It seems the most common plot size is 10 x 10m, so it would be easiest if we just went with this? Otherwise we could look at some kind of area scaling, which could add a novel angle to the paper, but could make analyses much more complicated... The only problem with going with 10 x 10m is that there are no plots for SK or Desert biomes...
+
+Here are a couple of figures to give you some idea of what the data look like:
+
+```{r, warning=FALSE}
+ggplot(data = d, aes(x = SURF_AREA, y = SpeciesRichness, colour = Biome)) + geom_point() + facet_wrap(~Biome) + geom_smooth(method = "loess")
+```
+
+
+
+Probably looks better as boxplots:
+
+```{r}
+ggplot(data = d, aes(x = as.factor(SURF_AREA), y = SpeciesRichness, colour = Biome)) + geom_boxplot() + facet_wrap(~Biome)
+```
+
+
+#Explore cutoffs for location confidence...
+
+First a summary showing how many plots fall within each location confidence category:
+
+```{r}
+summary(as.factor(d$Loc_Conf))
+```
+
+How many plots with location confidence 5km or less?
+
+```{r}
+sum(d$Loc_Conf<5001)
+```
+
+2km or less?
+
+```{r}
+sum(d$Loc_Conf<2001)
+```
+
+Some plots in space to check coverage:
+
+```{r}
+#Make the plots a spatial object and project
+spd <- d
+coordinates(spd) <- ~ Long + Lat
+proj4string(spd) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" #Assign a coordinate reference system (Geographic WGS84)
+
+#Get a map of the outline of South Africa
+map <- map("world", region = "south africa", fill = TRUE, plot=F)
+IDs <- sapply(strsplit(map$names, ":"), function(x) x[1])
+map <- map2SpatialPolygons(map, IDs=IDs, proj4string=CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+
+#Crop map to the extent of the points
+map <- crop(map, extent(spd)+c(-1.5,1,-1,1))
+
+#Plot the map
+plot(map)
+points(spd, cex=.5)
+```
+

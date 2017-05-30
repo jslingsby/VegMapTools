@@ -40,7 +40,7 @@ SD <- read.csv(paste0(datwd, "SpeciesData.txt")) #Species Data
 SN <- read.csv(paste0(datwd, "SpeciesList.txt")) #Species Names
 MD <- read.csv(paste0(datwd, "MetadataActionsEtc_Head.txt")) #Meta Data
 
-SAPIA <- read.csv("/Users/jasper/Documents/Databases/SAPIA/SAPIA.csv", stringsAsFactors = FALSE)
+#SAPIA <- read.csv("/Users/jasper/Documents/Databases/SAPIA/SAPIA.csv", stringsAsFactors = FALSE)
 
 ##########################################
 ###3) Spatial checking and subsetting
@@ -100,10 +100,10 @@ d <- d[-which(x>1000),] #Trim points >1km from the coast
 #dat <- d[, which(names(d) %in% c("RELEVE_NR", "ORIG_DB", "Veg", "Loc_Conf", "Lat", "Long", "SURF_AREA", "PlotAreaConf", "SpeciesBias"))]@data
 
 #Trim to plots with good surface area information
-d <- d[which(d$PlotAreaConf == "Use" & d$SpeciesBias %in% c("All species present", "Full floristics", "Permanently recognisable species")),]
+d <- d[which(d$PlotAreaConf == "Use" & d$SpeciesBias %in% c("All species present", "Full floristics", "Permanently recognisable species", "Grasses, extremely few other")),]
 
 #Trim to plots with certain surface areas
-d <- d[which(d$SURF_AREA %in% c(16,25,50,100,200,400,900)),]
+#d <- d[which(d$SURF_AREA %in% c(16,25,50,100,200,400,900)),]
 
 ##########################################
 ###6) Match with plot species lists, calculate SR and generate Genus table
@@ -115,22 +115,25 @@ DS <- SD[which(SD$RELEVE_NR %in% d$RELEVE_NR),]
 #Make genus level community matrix by matching species names and extracting genus
 SSN <- SN[,c("SPECIES_NR", "SPECIESNAME", "FamName")] #Extract Genus names
 DS <- merge(DS, SSN, all.x = TRUE)
-DS$Genus <- apply(as.data.frame(DS$SPECIESNAME), MARGIN = 1, FUN = function(x){strsplit(x, split = " ")[[1]][1]})
+#DS$Genus <- apply(as.data.frame(DS$SPECIESNAME), MARGIN = 1, FUN = function(x){strsplit(x, split = " ")[[1]][1]})
 
 #Remove non-"higher" plants
-exfam <- c("ANEMIACEAE", "ASPLENIACEAE", "AZOLLACEAE", "BARTRAMIACEAE", "BLECHNACEAE", "BRACHYTHECIACEAE", "BRYACEAE", "CYATHEACEAE", "DENNSTAEDTIACEAE", "DICRANACEAE", "DRYOPTERIDACEAE", "ELAPHOGLOSSACEAE", "EQUISETACEAE", "FABRONIACEAE", "FISSIDENTACEAE", "FONTINALACEAE", "GLEICHENIACEAE", "HYMENOPHYLLACEAE", "HYPNACEAE", "ISOETACEAE", "JUNGERMANNIACEAE", "LYCOPODIACEAE", "MARATTIACEAE", "MARCHANTIACEAE", "MARSILEACEAE", "MNIACEAE", "OPHIOGLOSSACEAE", "OSMUNDACEAE", "PALLAVICINIACEAE", "PARMELIACEAE", "PLAGIOCHILACEAE", "POLYPODIACEAE", "POTTIACEAE", "PTERIDACEAE", "RICCIACEAE", "SCHIZAEACEAE", "SELAGINELLACEAE", "SEMATOPHYLLACEAE", "SPHAGNACEAE", "THELYPTERIDACEAE", "THUIDIACEAE", "VITTARIACEAE", "WOODSIACEAE")
+#exfam <- c("ANEMIACEAE", "ASPLENIACEAE", "AZOLLACEAE", "BARTRAMIACEAE", "BLECHNACEAE", "BRACHYTHECIACEAE", "BRYACEAE", "CYATHEACEAE", "DENNSTAEDTIACEAE", "DICRANACEAE", "DRYOPTERIDACEAE", "ELAPHOGLOSSACEAE", "EQUISETACEAE", "FABRONIACEAE", "FISSIDENTACEAE", "FONTINALACEAE", "GLEICHENIACEAE", "HYMENOPHYLLACEAE", "HYPNACEAE", "ISOETACEAE", "JUNGERMANNIACEAE", "LYCOPODIACEAE", "MARATTIACEAE", "MARCHANTIACEAE", "MARSILEACEAE", "MNIACEAE", "OPHIOGLOSSACEAE", "OSMUNDACEAE", "PALLAVICINIACEAE", "PARMELIACEAE", "PLAGIOCHILACEAE", "POLYPODIACEAE", "POTTIACEAE", "PTERIDACEAE", "RICCIACEAE", "SCHIZAEACEAE", "SELAGINELLACEAE", "SEMATOPHYLLACEAE", "SPHAGNACEAE", "THELYPTERIDACEAE", "THUIDIACEAE", "VITTARIACEAE", "WOODSIACEAE")
 
-DS <- DS[-which(DS$FamName %in% exfam),]
+#DS <- DS[-which(DS$FamName %in% exfam),]
 
 #Remove alien species
-SAPIA <- trim(SAPIA)
-SAPIA <- SAPIA[-which(SAPIA$species %in% c("cf.", "sp.", "cf")),]
-SAPIA$Names <- apply(SAPIA[,1:2], MARGIN = 1, FUN = "paste0", collapse = " ")
+#SAPIA <- trim(SAPIA)
+#SAPIA <- SAPIA[-which(SAPIA$species %in% c("cf.", "sp.", "cf")),]
+#SAPIA$Names <- apply(SAPIA[,1:2], MARGIN = 1, FUN = "paste0", collapse = " ")
 
-DS <- DS[-which(DS$SPECIESNAME %in% SAPIA$Names),]
+#DS <- DS[-which(DS$SPECIESNAME %in% SAPIA$Names),]
 
-#Make Genus matrix
-y <- tapply(DS$COVER_PERC, list(DS$RELEVE_NR, DS$Genus), sum)
+DS <- DS[which(DS$FamName == "POACEAE"),] #Extract grasses only
+
+#Make  matrix
+DS$SPECIESNAME <- as.character(DS$SPECIESNAME)
+y <- tapply(DS$COVER_PERC, list(DS$RELEVE_NR, DS$SPECIESNAME), sum)
 y[is.na(y)] <- 0
 spp1 <- as.data.frame(y)
 rownames(spp1) <- unique(DS$RELEVE_NR)
@@ -138,7 +141,7 @@ rownames(spp1) <- unique(DS$RELEVE_NR)
 #Calculate species number
 #Trim plot data to those with species lists
 d <- d[-which(!d$RELEVE_NR %in% DS$RELEVE_NR),] 
-d$SpeciesRichness <- aggregate(DS$SPECIES_NR, by = list(DS$RELEVE_NR), FUN = function(x){length(unique(x))})[,2] 
+#d$SpeciesRichness <- aggregate(DS$SPECIES_NR, by = list(DS$RELEVE_NR), FUN = function(x){length(unique(x))})[,2] 
 
 ##########################################
 ###7) Trim and export data
@@ -146,10 +149,10 @@ d$SpeciesRichness <- aggregate(DS$SPECIES_NR, by = list(DS$RELEVE_NR), FUN = fun
 
 spp <- decostand(spp1, "pa")
 
-ed <- d[, c("RELEVE_NR", "ORIG_DB", "PlotYear", "Lat", "Long", "Loc_Conf", "Biome", "MapName50k", "SpeciesBias", "SURF_AREA", "SpeciesRichness")]
+ed <- d[, c("RELEVE_NR", "ORIG_DB", "PlotYear", "Lat", "Long", "Loc_Conf", "Biome", "MapName50k", "SURF_AREA")]
 
-write.csv(spp, "Data/genusmatrix_PA.csv")
-write.csv(ed, "Data/genus_PA_plotdat.csv")
+write.csv(spp, "Data/grassmatrix_PA.csv")
+write.csv(ed, "Data/grass_PA_plotdat.csv")
 
 ##########################################
 ##################END#####################
