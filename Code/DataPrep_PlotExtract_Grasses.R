@@ -152,6 +152,7 @@ spp <- decostand(spp1, "pa")
 ed <- d[, c("RELEVE_NR", "ORIG_DB", "PlotYear", "Lat", "Long", "Loc_Conf", "Biome", "MapName50k", "SURF_AREA")]
 
 write.csv(spp, "Data/grassmatrix_PA.csv")
+write.csv(spp1, "Data/grassmatrix_PerCov.csv")
 write.csv(ed, "Data/grass_PA_plotdat.csv")
 
 ##########################################
