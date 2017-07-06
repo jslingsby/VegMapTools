@@ -1,0 +1,256 @@
+---
+title: "library(redlistr) test"
+output: html_notebook
+---
+
+### Get libraries and set working directory
+
+<br>
+
+```{r}
+library(raster)
+library(gdalUtils)
+library(rgdal)
+library(dplyr)
+library(redlistr)
+library(cleangeo)
+library(doParallel) 
+
+if(Sys.getenv("USER")=="jasper") {datwd <- "/Users/jasper/Documents/GIS/VegToolsRaw/"}
+if(Sys.getenv("USERNAME")=="MatlalaM") {datwd <- "Your data directory"}
+```
+
+<br>
+
+### Get and process data
+
+<br>
+
+```{r}
+###Set desired extent
+#nex <- extent(-320000, -220000, 6150000, 6250000)
+
+###Land cover - get, crop and write out, read in
+lc <- raster(paste(datwd, "Landcover/LCsmiso_trans1.tif", sep=""))
+#lc
+#crop(lc, nex, filename = "Data/CTtest.grd", overwrite=T)
+#lc <- raster("Data/CTtest.grd")
+
+###VegMap 2006
+vm2006 <- readOGR(paste(datwd, "VM2006", sep=""), layer = "vegmap2006_geo") #Get data
+vm2006 <- spTransform(vm2006, CRS(proj4string(lc))) #reproject to UTM35S
+#vm2006 <- crop(vm2006, nex) #crop
+
+fyn2006 <- vm2006[which(vm2006$BIOME=="Fynbos Biome"),] #subset by biome etc
+
+fyn10 <- vm2006[which(vm2006$NAME %in% levels(vm2006$NAME)[1:10]),]
+
+slot(fyn10, "data") <- droplevels(slot(fyn10, "data"))
+
+#fyn10 <- droplevels(fyn10)
+```
+
+<br>
+
+Identify VegMap polygons with issues...
+
+<br>
+
+```{r}
+##Fix issues with spatial object to allow plotting fires on map - see https://gis.stackexchange.com/questions/113964/fixing-orphaned-holes-in-r
+report <- clgeo_CollectionReport(vm2006)
+#summary <- clgeo_SummaryReport(report)
+#issues <- report[report$valid == FALSE,]
+nv <- clgeo_SuspiciousFeatures(report)
+fyn10 <- fyn10[-nv,]
+
+##try to clean data
+#mysp.clean <- clgeo_Clean(mysp)
+##check if they are still errors
+#report.clean <- clgeo_CollectionReport(mysp.clean)
+#summary.clean <- clgeo_SummaryReport(report.clean)
+```
+
+```{r}
+
+# ecotype <- fyn10 #vm2006
+# #landcover <- lc
+# #typenames <- "NAME"
+# yearT1 = 1750
+# yearT2 = 2014
+# transformation.mask.value = 2
+# mask.inverse = FALSE
+# AOOgrid = 10000
+# mprL = FALSE
+# mpr = 1
+# i = 1
+
+### Inputs
+# ecotype : SpatialPolygonsDataFrame with column "NAME" to identify which polygon is from which ecosystem type
+# landcover : raster
+# yearT1 : numeric - Year that "ecotypes" layers represents (i.e. Historical would be 1750, etc)
+# yearT2 : numeric - Year that landcover represents
+# transformation.mask.value : numeric - Landcover raster value used to mask (default represents transformed)
+# mask.inverse : logical - set to TRUE for transformation.mask.value to represent untransformed
+# AOOgrid : numeric - AOO grid size - default is 10000
+# mprL : logical - apply min.percent.rule in getAOO() - default FALSE
+# mpr : numeric - percent to apply min.percent.rule in getAOO() - default is 1
+# cores : numeric - how many cores to use for parallel processing - default is 1 (i.e. process normally in sequence)
+
+allAreaOccupancy <- function(ecotype, landcover, yearT1, yearT2, transformation.mask.value, mask.inverse = FALSE, AOOgrid = 10000, mprL = FALSE, mpr = 1, cores = 1)
+{
+
+#Get unique ecosystem type names
+etnames <- levels(as.factor(ecotype$NAME))
+
+#Set up cluster for parallel processing
+registerDoParallel(cores = cores)
+
+#Start parallel processing loop
+fout = foreach(i=1:length(etnames),.combine=rbind,.packages=c("raster","redlistr")) %dopar% {
+
+out <- NULL #Create object to feed outputs into
+  
+et <- ecotype[which(ecotype$NAME %in% etnames[i]),] #Select ecosystem type one at a time
+out$NumberLocations <- nrow(et) #Assumes non-abutting polygons... (there are existing functions to test this, but I can;t recall the name right now)
+  
+#Prepare rasters for each ecosystem type
+lci <- crop(landcover, extent(et)) #Crop landcover to extent of ecosystem type
+eti1 <- rasterize(et, lci, field = "NAME", fun = "count") #Rasterize "untransformed" ecosystem type
+eti2 <- mask(eti1, lci, maskvalue=transformation.mask.value, inverse=mask.inverse) #Create raster with transformed land cover masked
+
+#Calculate statistics
+out$AreaT1 <- getArea(eti1)
+out$AreaT2 <- getArea(eti2)
+EOO.polygon <- makeEOO(eti1)
+out$EOOT1 <- getAreaEOO(EOO.polygon)
+EOO.polygon <- makeEOO(eti2)
+out$EOOT2 <- getAreaEOO(EOO.polygon)
+out$AOOT1 <- getAOO(eti1, grid.size = AOOgrid, min.percent.rule = mprL, percent = mpr)
+out$AOOT2 <- getAOO(eti2, grid.size = AOOgrid, min.percent.rule = mprL, percent = mpr)
+
+return(unlist(out))
+} #End parallel processing loop
+
+fout <- as.data.frame(fout, row.names = etnames)
+return(fout)
+}
+
+test <- allAreaOccupancy(ecotype = fyn10, landcover = lc, yearT1 = 1750, yearT2 = 2014, transformation.mask.value = 2)
+  
+```
+
+
+
+```{r}
+
+ecotype <- fyn10 #vm2006
+#landcover <- lc
+#typenames <- "NAME"
+yearT1 <- 1750
+yearT2 <- 2014
+transformation.mask.value <- 2
+mask.inverse = FALSE
+AOOgrid = 10000
+mprL = FALSE
+mpr = 1
+i <- 1
+
+
+#Get unique ecosystem type names
+etnames <- levels(as.factor(ecotype$NAME))
+
+#Prepare output dataframe
+out <- data.frame(TypeNames = etnames, AreaT1 = NA, AreaT2 = NA, EOOT1 = NA, EOOT2 = NA, AOOT1 = NA, AOOT2 = NA, NumberLocations = NA)
+
+#Select each ecosystem type one at a time
+for(i in 1:length(etnames))
+{
+et <- ecotype[which(ecotype$NAME %in% etnames[i]),] #Select ecosystem type one at a time
+out$NumberLocations[i] <- nrow(et) #Assumes non-abutting polygons...
+  
+#Prepare rasters for each ecosystem type
+lci <- crop(lc, extent(et)) #Crop landcover to extent of ecosystem type
+eti1 <- rasterize(et, lci, field = "NAME", fun = "count") #Rasterize ecosystem type
+eti2 <- mask(eti1, lci, maskvalue=transformation.mask.value, inverse=mask.inverse) #Remove transformed land cover
+
+#Calculate statistics
+out$AreaT1[i] <- getArea(eti1)
+out$AreaT2[i] <- getArea(eti2)
+EOO.polygon <- makeEOO(eti1)
+out$EOOT1[i] <- getAreaEOO(EOO.polygon)
+EOO.polygon <- makeEOO(eti2)
+out$EOOT2[i] <- getAreaEOO(EOO.polygon)
+out$AOOT1[i] <- getAOO(eti1, grid.size = AOOgrid, min.percent.rule = mprL, percent = mpr)
+out$AOOT2[i] <- getAOO(eti2, grid.size = AOOgrid, min.percent.rule = mprL, percent = mpr)
+}
+
+#Parallel version
+fout = foreach(i=1:length(etnames),.combine=rbind,.packages=c("raster","redlistr")) %dopar% {
+
+out <- NULL #Create object to feed outputs into
+  
+et <- ecotype[which(ecotype$NAME %in% etnames[i]),] #Select ecosystem type one at a time
+out$NumberLocations <- nrow(et) #Assumes non-abutting polygons...
+  
+#Prepare rasters for each ecosystem type
+lci <- crop(lc, extent(et)) #Crop landcover to extent of ecosystem type
+eti1 <- rasterize(et, lci, field = "NAME", fun = "count") #Rasterize "untransformed" ecosystem type
+eti2 <- mask(eti1, lci, maskvalue=transformation.mask.value, inverse=mask.inverse) #Create raster with transformed land cover masked
+
+#Calculate statistics
+out$AreaT1 <- getArea(eti1)
+out$AreaT2 <- getArea(eti2)
+EOO.polygon <- makeEOO(eti1)
+out$EOOT1 <- getAreaEOO(EOO.polygon)
+EOO.polygon <- makeEOO(eti2)
+out$EOOT2 <- getAreaEOO(EOO.polygon)
+out$AOOT1 <- getAOO(eti1, grid.size = AOOgrid, min.percent.rule = mprL, percent = mpr)
+out$AOOT2 <- getAOO(eti2, grid.size = AOOgrid, min.percent.rule = mprL, percent = mpr)
+
+return(unlist(out))
+}
+
+rownames(fout) <- etnames
+fout <- as.data.frame(fout)
+
+#Area calculation test...
+titi <- sapply(slot(ecotype, "polygons"), slot, "area")/1E+6
+titi <- aggregate(titi, by = list(ecotype$NAME), FUN = sum)
+
+fout$AreaPolygon <-titi$x
+fout$AreaPolygon/fout$AreaT1
+
+
+plot(AreaT1 ~ AreaPolygon, data = fout)
+abline(0,1)
+
+###From here can be done on the table...
+# AreaLost = NA, ARD = NA, PRD = NA, ARC = NA, FutureArea_ARD = NA, FutureArea_PRD = NA, FutureArea_ARC = NA
+
+dcstats <- getDeclineStats(out$AreaT1[i], out$AreaT2[i], yearT1, yearT2, methods = c('ARD', 'PRD', 'ARC'))
+out$AreaLost[i] <- dcstats$area.loss
+out$ARD[i] <- dcstats$ARD
+out$PRD[i] <- dcstats$PRD
+out$ARC[i] <- dcstats$ARC
+
+exarea <- futureAreaEstimate(out$AreaT1[i], year.t1 = 1750,
+ ARD = out$ARD[i],
+ PRD = out$PRD[i],
+ ARC = out$ARC[i],
+ nYears = 50)
+
+
+# # of locations 
+
+
+###
+, filename="Data/vegtype.grd", overwrite=T) #Rasterize  #, field="NAME"
+vt <- raster("Data/vegtype.grd") #Read in rasterized veg types
+vtnames <- levels(vt)[[1]]
+#vtnames <- levels(vm2006$NAME)[levels(vt)[[1]]$ID]
+#levels(vt) <- data.frame(ID = levels(vt)[[1]]$ID, NAMES = vtnames)
+rm(vm2006) #Remove any large objects that aren't being used from memory...
+
+```
+
