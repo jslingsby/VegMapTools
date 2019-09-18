@@ -24,12 +24,14 @@ vdat$RE <- (vdat$POLYSQKM*as.numeric(gsub("\\%", "", as.character(vdat$REMAINING
 
 #Summarise data by veg type
 #vsum <- summarise(group_by(vdat, NAME), PL=sum(PL, na.rm=T), RE=sum(RE, na.rm=T))
-vsum <- summarise(group_by(vdat, NAME), PL=sum(PL), RE=sum(RE))
+vsum <- summarise(group_by(vdat, NAME), PL=sum(PL), RE=sum(RE)) #
 
 #Get ancillary info and add to vegtype summary
 adat <- unique(vdat[,which(colnames(vdat)%in%c("NAME", "CONSTRGT", "BIOME", "CNSRVTNSTT", "VTYPESQKM"))])
 
 dat <- merge(vsum, adat) #Merge data
+
+#Peninsula veg types View(dat[c(50:52, 55, 127, 281:283, 332),])
 
 dat$CONSTRGT <- as.numeric(gsub("\\%", "", as.character(dat$CONSTRGT))) #Make conservation target numeric
 
