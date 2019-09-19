@@ -7,10 +7,12 @@
 
 library(tidyverse)
 library(readxl)
+library(reshape2)
 library(sp)
 library(rgdal)
 library(rgeos)
 library(raster)
+library(cowplot)
 
 # #Get vegmap - replace with latest?
 # vegmap <- readOGR(dsn = "/Users/jasper/Documents/GIS/South Africa/NVM2012_Wgs84_Geo_06072017/NVM2012_Wgs84_Geo_06072017.shp", layer = "NVM2012_Wgs84_Geo_06072017")
@@ -87,9 +89,9 @@ bhb <- spTransform(bh, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +uni
 
 
 
-buffs <- seq(5, 1000, 5)
+buffs <- seq(10, 500, 10)
 
-out <- as.data.frame(matrix(NA, length(buffs))
+out <- list() #as.data.frame(matrix(NA, length(buffs))
 
 for(i in 1:length(buffs)) {
 bhb100 <- gBuffer(bhb, byid = TRUE, width = buffs[i])
@@ -100,19 +102,57 @@ names(int100) <- bhb100@data$Name
 intu100 <- do.call(rbind, int100)
 intu100$drill <- sapply(rownames(intu100), function(x){strsplit(x, split = "\\.")[[1]][1]})
 
-length(intu100$Taxon) # populations
-length(unique(intu100$Taxon)) # species
-length(intu100$`NATIONAL STATUS` == "DDD")
-length(intu100$`NATIONAL STATUS` == "Rare")
-length(intu100$`NATIONAL STATUS` == "Critically Rare")
-length(intu100$`NATIONAL STATUS` == "NT")
-length(intu100$`NATIONAL STATUS` == "VU")
-length(intu100$`NATIONAL STATUS` == "EN")
-length(intu100$`NATIONAL STATUS` == "CR")
-length(intu100$`NATIONAL STATUS` == "CR PE")
-length(intu100$`NATIONAL STATUS` == "EW")
-
+out[[i]] <- intu100
 }
+
+names(out) <- buffs
+out <- do.call(rbind, out)
+out$buffer <- sapply(rownames(out), function(x){strsplit(x, split = "\\.")[[1]][1]})
+
+dat <- out %>% group_by(buffer, `NATIONAL STATUS`) %>% summarise(nSpp = n_distinct(Taxon), nPopln = n())
+
+dat$buffer <- as.numeric(dat$buffer)
+
+dat <- melt(dat, id = c("buffer", "NATIONAL STATUS")) 
+
+g <- ggplot(dat) +
+  geom_area(aes(y = value, x = buffer, fill = `NATIONAL STATUS`)) +
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+
+gl <- ggplot(dat) +
+  geom_line(aes(y = value, x = buffer, colour = `NATIONAL STATUS`)) +
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+
+
+##########################
+gspp <- ggplot(spp) +
+  geom_line(aes(y = nSpp, x = buffer, colour = `NATIONAL STATUS`)) 
+
+pop <- out %>% group_by(buffer, `NATIONAL STATUS`) %>% summarise(nPopln = n())
+pop$buffer <- as.numeric(pop$buffer)
+
+gpop <- ggplot(pop) +
+  geom_line(aes(y = nPopln, x = buffer, colour = `NATIONAL STATUS`))
+
+
+impact <- ggdraw() +
+  draw_plot(gspp, x = 0, y = 0, width = .5, height = 1) + 
+  draw_plot(gpop, x = 0.5, y = 0, width = .5, height = 1)
+
+# length(intu100$Taxon) # populations
+# length(unique(intu100$Taxon)) # species
+# length(intu100$`NATIONAL STATUS` == "DDD")
+# length(intu100$`NATIONAL STATUS` == "Rare")
+# length(intu100$`NATIONAL STATUS` == "Critically Rare")
+# length(intu100$`NATIONAL STATUS` == "NT")
+# length(intu100$`NATIONAL STATUS` == "VU")
+# length(intu100$`NATIONAL STATUS` == "EN")
+# length(intu100$`NATIONAL STATUS` == "CR")
+# length(intu100$`NATIONAL STATUS` == "CR PE")
+# length(intu100$`NATIONAL STATUS` == "EW")
+
 
 #Extract all threatened species occurring within the borehole buffer zones and simplify data
 int1000 <- over(bhb1000, tsppp, returnList = T)
