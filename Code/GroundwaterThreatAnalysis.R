@@ -2,7 +2,7 @@
 ### Species threatened by Aquifer abstraction
 ##################################################
 ### Compiled by Jasper Slingsby
-### 8 July 2019
+### 18 September 2019
 ##################################################
 
 library(tidyverse)
@@ -12,24 +12,30 @@ library(rgdal)
 library(rgeos)
 library(raster)
 
-#Get vegmap - replace with latest?
-vegmap <- readOGR(dsn = "/Users/jasper/Documents/GIS/South Africa/NVM2012_Wgs84_Geo_06072017/NVM2012_Wgs84_Geo_06072017.shp", layer = "NVM2012_Wgs84_Geo_06072017")
-
-#Get protected areas
-pa <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/PA/PA14_terUTM34s.shp", layer = "PA14_terUTM34s")
-
-pa <- spTransform(pa, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
-
-# #Get land cover
-# lc <- raster("/Users/jasper/Documents/GIS/Landcover/NLC  Degradation/Fynbs_NLC1.tif")
-# lc <- lc<2
-
-#Get geology
-geo <- readOGR(dsn = "/Users/jasper/Documents/GIS/Geology/CFB_Lithology Maps (665Mb)/1_250000/New Folder/GeologyWGS1984.shp", layer = "GeologyWGS1984")
+# #Get vegmap - replace with latest?
+# vegmap <- readOGR(dsn = "/Users/jasper/Documents/GIS/South Africa/NVM2012_Wgs84_Geo_06072017/NVM2012_Wgs84_Geo_06072017.shp", layer = "NVM2012_Wgs84_Geo_06072017")
+# 
+# #Get protected areas
+# pa <- readOGR(dsn = "/Users/jasper/Documents/GIS/VegToolsRaw/PA/PA14_terUTM34s.shp", layer = "PA14_terUTM34s")
+# 
+# pa <- spTransform(pa, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+# 
+# # #Get land cover
+# # lc <- raster("/Users/jasper/Documents/GIS/Landcover/NLC  Degradation/Fynbs_NLC1.tif")
+# # lc <- lc<2
+# 
+# #Get geology
+# geo <- readOGR(dsn = "/Users/jasper/Documents/GIS/Geology/CFB_Lithology Maps (665Mb)/1_250000/New Folder/GeologyWGS1984.shp", layer = "GeologyWGS1984")
 
 
 #Get threatened species data and project to UTM34S
-tspp <- readOGR(dsn = "/Users/jasper/Dropbox/SAEON/Projects/TMGA/SANBI_Scoping/CREW Survey Priorities/AllTOCCs_2017.shp", layer = "AllTOCCs_2017")
+tspp <- read_delim("/home/jasper/Dropbox/SAEON/Projects/SANBI/ThreatenedSpecies/WC_TOCC.txt", delim = "\t")
+
+coordinates(tspp) <- ~ Long + Lat
+
+proj4string(tspp) <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+
+#tspp <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/SANBI_Scoping/CREW Survey Priorities/AllTOCCs_2017.shp", layer = "AllTOCCs_2017")
 
 tsppp <- spTransform(tspp, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
 
@@ -37,57 +43,76 @@ tsppp <- spTransform(tspp, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 
 
 tsppp$UID <- 1:nrow(tsppp@data)
 
-tsp_rare <- tsppp[which(tsppp$NATIONAL.S%in% c("Critically Rare", "Rare")),]
-
+tsp_rare <- tsppp[which(tsppp$'NATIONAL STATUS'%in% c("Critically Rare", "Rare")),]
 
 #Get obligate wetland species
-obl <- read.xlsx("/Users/jasper/Dropbox/SAEON/Projects/TMGA/Paper/Threat of Groundwater/Obligate_wetland_species.xlsx", sheet = 1)
+#obl <- read_xlsx("/home/jasper/Dropbox/SAEON/Projects/TMGA/Paper/Threat of Groundwater/Obligate_wetland_species.xlsx", sheet = 1)
 
 #Get borehole site data and project to UTM34S
-bh <- readOGR(dsn = "/Users/jasper/Dropbox/SAEON/Projects/TMGA/boreholesites/TMGA.kml", layer = "TMGA")
+bh <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/boreholesites/TMGA.kml", layer = "TMGA")
 
 bhb <- spTransform(bh, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
 
 #bh35 <- spTransform(bh, "+proj=utm +zone=35 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
 
 
-#Boreholes by PA
-pad <- over(bhb, pa)
-sum(!is.na(pad[,1])) # in protected areas
-pad$Name <- as.character(bhb$Name)
-
-#Boreholes by veg type
-veg <- over(bh, vegmap)
-veg$Name <- as.character(bh$Name)
-
-#Boreholes by land cover
-#lcd <- over(bhb, lc)
-lcd <- raster::extract(lc, coordinates(bh35)[,1:2])
-
-#lcs <- crop(lc, bh35, snap = "out")
-#lcd <- extract(lcs, bh35) #coordinates(bh35)[1:2])
-#SpatialPoints(coordinates(bhb)[1:2], proj4string=CRS(proj4string(lc))))
-
-#Merge PA and veg type results
-out <- merge(pad, veg)
-out$Natural <- lcd
-pen <- out[substr(out$Name,1,2) %in% c("CB", "MB", "RD", "SM", "SW"),]
-penout <- pen[,c(1,2,5,10)]
-#write.csv(penout, "/Users/jasper/Dropbox/SAEON/Projects/TMGA/Meetings/29_March_EWG_Screening_tool/screeningtool_v0.1/SPD.csv")
+# #Boreholes by PA
+# pad <- over(bhb, pa)
+# sum(!is.na(pad[,1])) # in protected areas
+# pad$Name <- as.character(bhb$Name)
+# 
+# #Boreholes by veg type
+# veg <- over(bh, vegmap)
+# veg$Name <- as.character(bh$Name)
+# 
+# #Boreholes by land cover
+# #lcd <- over(bhb, lc)
+# lcd <- raster::extract(lc, coordinates(bh35)[,1:2])
+# 
+# #lcs <- crop(lc, bh35, snap = "out")
+# #lcd <- extract(lcs, bh35) #coordinates(bh35)[1:2])
+# #SpatialPoints(coordinates(bhb)[1:2], proj4string=CRS(proj4string(lc))))
+# 
+# #Merge PA and veg type results
+# out <- merge(pad, veg)
+# out$Natural <- lcd
+# pen <- out[substr(out$Name,1,2) %in% c("CB", "MB", "RD", "SM", "SW"),]
+# penout <- pen[,c(1,2,5,10)]
+# #write.csv(penout, "/Users/jasper/Dropbox/SAEON/Projects/TMGA/Meetings/29_March_EWG_Screening_tool/screeningtool_v0.1/SPD.csv")
 
 
 
 #Buffer boreholes with set distance (in m)
-bhb1000 <- gBuffer(bhb, byid = TRUE, width = 1000)
-bhb100 <- gBuffer(bhb, byid = TRUE, width = 100)
+#bhb1000 <- gBuffer(bhb, byid = TRUE, width = 1000)
+
+
+
+buffs <- seq(5, 1000, 5)
+
+out <- as.data.frame(matrix(NA, length(buffs))
+
+for(i in 1:length(buffs)) {
+bhb100 <- gBuffer(bhb, byid = TRUE, width = buffs[i])
 
 #Extract all "Rare" and "Critically Rare" species occurring within the borehole buffer zones and simplify data
-int100 <- over(bhb100, tsp_rare, returnList = T)
+int100 <- over(bhb100, tsppp, returnList = T)
 names(int100) <- bhb100@data$Name
 intu100 <- do.call(rbind, int100)
 intu100$drill <- sapply(rownames(intu100), function(x){strsplit(x, split = "\\.")[[1]][1]})
 
-levels(droplevels(intu100$Taxon))
+length(intu100$Taxon) # populations
+length(unique(intu100$Taxon)) # species
+length(intu100$`NATIONAL STATUS` == "DDD")
+length(intu100$`NATIONAL STATUS` == "Rare")
+length(intu100$`NATIONAL STATUS` == "Critically Rare")
+length(intu100$`NATIONAL STATUS` == "NT")
+length(intu100$`NATIONAL STATUS` == "VU")
+length(intu100$`NATIONAL STATUS` == "EN")
+length(intu100$`NATIONAL STATUS` == "CR")
+length(intu100$`NATIONAL STATUS` == "CR PE")
+length(intu100$`NATIONAL STATUS` == "EW")
+
+}
 
 #Extract all threatened species occurring within the borehole buffer zones and simplify data
 int1000 <- over(bhb1000, tsppp, returnList = T)
