@@ -13,6 +13,7 @@ library(rgdal)
 library(rgeos)
 library(raster)
 library(cowplot)
+library(wesanderson)
 
 # #Get vegmap - replace with latest?
 # vegmap <- readOGR(dsn = "/Users/jasper/Documents/GIS/South Africa/NVM2012_Wgs84_Geo_06072017/NVM2012_Wgs84_Geo_06072017.shp", layer = "NVM2012_Wgs84_Geo_06072017")
@@ -110,21 +111,33 @@ out <- do.call(rbind, out)
 out$buffer <- sapply(rownames(out), function(x){strsplit(x, split = "\\.")[[1]][1]})
 
 dat <- out %>% group_by(buffer, `NATIONAL STATUS`) %>% summarise(nSpp = n_distinct(Taxon), nPopln = n())
-
 dat$buffer <- as.numeric(dat$buffer)
-
 dat <- melt(dat, id = c("buffer", "NATIONAL STATUS")) 
+
+pal <- wes_palette(7, name = "Zissou1", type = "continuous")
+image(volcano, col = pal)
+#cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
 
 g <- ggplot(dat) +
   geom_area(aes(y = value, x = buffer, fill = `NATIONAL STATUS`)) +
   facet_wrap(~variable, scales = "free") +
-  theme_bw()
+  theme_bw() +
+  scale_fill_manual(values=rev(pal)) +
+  xlab("Buffer distance (m)") +
+  ylab ("Number")
 
 gl <- ggplot(dat) +
   geom_line(aes(y = value, x = buffer, colour = `NATIONAL STATUS`)) +
   facet_wrap(~variable, scales = "free") +
-  theme_bw()
+  theme_bw() +
+  scale_colour_manual(values=rev(pal)) +
+  xlab("Buffer distance (m)") +
+  ylab ("Number")
 
+g
+
+gl
 
 ##########################
 gspp <- ggplot(spp) +
