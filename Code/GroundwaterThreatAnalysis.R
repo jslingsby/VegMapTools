@@ -34,6 +34,20 @@ library(ggspatial)
 # #Get geology
 # geo <- readOGR(dsn = "/Users/jasper/Documents/GIS/Geology/CFB_Lithology Maps (665Mb)/1_250000/New Folder/GeologyWGS1984.shp", layer = "GeologyWGS1984")
 
+####Get borehole site data and project to UTM34S
+#bh <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/boreholesites/TMGA.kml", layer = "TMGA") #Originals
+#bhb <- spTransform(bh, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+#bh35 <- spTransform(bh, "+proj=utm +zone=35 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+
+#Switch names for plots or group for impact figure
+sbh <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/boreholesites/Steenbras.kml", layer = "Steenbras")
+gbh <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/boreholesites/Groenlandberg core Sept19.kml", layer = "Groenlandberg core Sept19")
+nbh <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/boreholesites/Nuweberg.kml", layer = "Nuweberg")
+
+bh <- rbind(sbh, gbh, nbh)
+bhb <- spTransform(bh, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+
+                                  
 ####Get threatened species data and project to UTM34S
 #tspp <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/SANBI_Scoping/CREW Survey Priorities/AllTOCCs_2017.shp", layer = "AllTOCCs_2017")
 tspp <- read_delim("/home/jasper/Dropbox/SAEON/Projects/SANBI/ThreatenedSpecies/WC_TOCC.txt", delim = "\t")
@@ -45,25 +59,28 @@ tsp_rare <- tspp[which(tspp$'NATIONAL STATUS'%in% c("Critically Rare", "Rare")),
 #writeOGR(tsp_rare["Taxon"], dsn = "/home/jasper/Dropbox/SAEON/Projects/SANBI/ThreatenedSpecies/tsp_rare.kml", layer="tsp_rare", driver="KML")
 
 tsppp <- spTransform(tspp, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
-
 #tsp35 <- spTransform(tspp, "+proj=utm +zone=35 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
-
 tsppp$UID <- 1:nrow(tsppp@data)
 
 tsp_rare <- tsppp[which(tsppp$'NATIONAL STATUS'%in% c("Critically Rare", "Rare")),]
 
 
 ####Make density layer
+#ext <- extent(18.75, 19, -34.22, -34.14) #Steenbras
+ext <- extent(bh) #Steenbras, Nuweberg, Groenlandberg
+
 alt <- raster("/home/jasper/Dropbox/SAEON/Projects/EMSAfrica/GJAM_data/altitude")
 tdens <- rasterize(tspp, alt, field = "Taxon", fun = "count")
-tdens <- crop(tdens, extent(18.75, 19, -34.22, -34.14))
+tdens <- crop(tdens, ext)
 tdensp <- projectRaster(tdens, crs = CRS("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs"))
 tdensd <- as.data.frame(rasterToPoints(tdensp, spatial = F))
 colnames(tdensd)[3] <- "Number of species"
 
-talt <- crop(alt, extent(18.75, 19, -34.22, -34.14)) #extent(18.25, 19.25, -34.5, -33.8))
+talt <- crop(alt, ext) #extent(18.25, 19.25, -34.5, -33.8))
 talt <- as.data.frame(rasterToPoints(talt, spatial = F))
 colnames(talt)[3] <- "elevation"
+
+bhc <- as.data.frame(coordinates(spTransform(bh, "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs")))
 
 register_tile_source(light = "http://a.basemaps.cartocdn.com/light_nolabels/${z}/${x}/${y}.png")
 
@@ -74,6 +91,7 @@ tdensr <- ggplot() +
   scale_fill_gradient(low = alpha("white",0.5) , high = alpha("red4",0.5), name = "Number of species") +
  # geom_contour(data=talt, aes(x, y, z=elevation), colour = "black", breaks = seq(100,1500,100), linemitre = 1, alpha = 0.5) +
 #  coord_fixed(1.3) + 
+  geom_point(data = bhc, aes(x = coords.x1, y = coords.x2)) +
   theme_bw() +
   theme(axis.line=element_blank(),
       # axis.text.x=element_blank(),
@@ -105,12 +123,6 @@ length(which(wspp$`Species name`%in%tspp$Taxon))
 length(which(owspp$`Species name`%in%tspp$Taxon))
 length(which(ofwspp$`Species name`%in%tspp$Taxon))
 
-#Get borehole site data and project to UTM34S
-bh <- readOGR(dsn = "/home/jasper/Dropbox/SAEON/Projects/TMGA/boreholesites/TMGA.kml", layer = "TMGA")
-
-bhb <- spTransform(bh, "+proj=utm +zone=34 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
-
-#bh35 <- spTransform(bh, "+proj=utm +zone=35 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
 
 
 # #Boreholes by PA
@@ -167,10 +179,13 @@ out$buffer <- sapply(rownames(out), function(x){strsplit(x, split = "\\.")[[1]][
 dat <- out %>% group_by(buffer, `NATIONAL STATUS`) %>% summarise(nSpp = n_distinct(Taxon), nPopln = n())
 dat$buffer <- as.numeric(dat$buffer)
 dat <- melt(dat, id = c("buffer", "NATIONAL STATUS")) 
+dat <- dat[-which(dat$`NATIONAL STATUS`=="CR PE"),]
 
-pal <- wes_palette(7, name = "Zissou1", type = "continuous")
-image(volcano, col = pal)
-#cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+#pal <- wes_palette(7, name = "Zissou1", type = "continuous")
+pal <- wes_palette(5, name = "Zissou1")
+#image(volcano, col = pal)
+#pal <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7") #colourblind palette
+pal <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7") #colourblind palette
 
 
 g <- ggplot(dat) +
